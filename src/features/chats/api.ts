@@ -2,6 +2,12 @@ import * as Crypto from 'expo-crypto';
 import { File } from 'expo-file-system';
 
 import { compressToJpeg } from '@/features/profile/api';
+import {
+  assertRateLimit,
+  sanitizeText,
+  validateGroupName,
+  validateMessageBody,
+} from '@/lib/security';
 import { supabase } from '@/lib/supabase';
 import type {
   BlockedUser,
@@ -75,6 +81,15 @@ export async function insertMessage(input: {
   mediaMeta?: Record<string, unknown> | null;
   durationMs?: number | null;
 }): Promise<Message> {
+  let cleanBody = input.body;
+  if (input.body !== null && input.kind !== 'system') {
+    const { clean, error } = validateMessageBody(input.body);
+    if (error) throw new ChatError(error);
+    cleanBody = clean;
+    // Anti-spam bots: máximo 20 mensajes cada 10 segundos por remitente
+    assertRateLimit(`msg:${input.senderId}`, 20, 10_000, 'Envías mensajes demasiado rápido.');
+  }
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
@@ -82,7 +97,7 @@ export async function insertMessage(input: {
       conversation_id: input.conversationId,
       sender_id: input.senderId,
       kind: input.kind ?? 'text',
-      body: input.body,
+      body: cleanBody,
       reply_to_id: input.replyToId ?? null,
       media_path: input.mediaPath ?? null,
       media_meta: input.mediaMeta ?? null,
@@ -104,9 +119,12 @@ export async function softDeleteMessage(id: string): Promise<void> {
 }
 
 export async function editMessage(id: string, body: string): Promise<void> {
+  const { clean, error: valError } = validateMessageBody(body);
+  if (valError) throw new ChatError(valError);
+
   const { error } = await supabase
     .from('messages')
-    .update({ body, edited_at: new Date().toISOString() })
+    .update({ body: clean, edited_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw new ChatError('No pudimos editar el mensaje.');
 }
@@ -122,6 +140,11 @@ export async function createDirectConversation(otherUserId: string): Promise<str
   });
   if (error) {
     if (/blocked/.test(error.message)) throw new ChatError('No puedes escribir a esta persona.');
+    if (/not_friends/.test(error.message)) {
+      throw new ChatError(
+        'Primero debes agregar a esta persona como amigo y que acepte tu solicitud.',
+      );
+    }
     throw new ChatError('No pudimos abrir la conversación.');
   }
   return data as string;
@@ -134,9 +157,13 @@ export async function searchUsers(term: string): Promise<UserSearchResult[]> {
 }
 
 export async function renameConversation(conversationId: string, name: string): Promise<void> {
+  const problem = validateGroupName(name);
+  if (problem) throw new ChatError(problem);
+  const cleanName = sanitizeText(name, 60);
+
   const { error } = await supabase
     .from('conversations')
-    .update({ name })
+    .update({ name: cleanName })
     .eq('id', conversationId);
   if (error) throw new ChatError('No pudimos renombrar el grupo.');
 }
@@ -292,8 +319,12 @@ export async function createGroupConversation(input: {
   memberIds: string[];
   localAvatarUri?: string | null;
 }): Promise<string> {
-  const cleanName = input.name.trim();
-  if (!cleanName) throw new ChatError('Escribe un nombre para el grupo.');
+  const problem = validateGroupName(input.name);
+  if (problem) throw new ChatError(problem);
+  const cleanName = sanitizeText(input.name, 60);
+
+  // Anti-bot rate limit: máx 5 grupos creados en 60 segundos
+  assertRateLimit(`create_grp:${input.creatorId}`, 5, 60_000, 'Demasiados grupos creados recientemente.');
 
   const uniqueMembers = [...new Set(input.memberIds.filter((id) => id && id !== input.creatorId))];
   if (uniqueMembers.length === 0) {
@@ -354,7 +385,11 @@ export async function updateGroupDetails(input: {
   systemText?: string;
 }): Promise<void> {
   const patch: { name?: string; avatar_path?: string | null } = {};
-  if (input.name !== undefined) patch.name = input.name.trim();
+  if (input.name !== undefined) {
+    const problem = validateGroupName(input.name);
+    if (problem) throw new ChatError(problem);
+    patch.name = sanitizeText(input.name, 60);
+  }
   if (input.avatarPath !== undefined) patch.avatar_path = input.avatarPath;
 
   const { error } = await supabase

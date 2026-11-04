@@ -1,47 +1,57 @@
 import * as Linking from 'expo-linking';
 
 import { unregisterPushNotificationsAsync } from '@/features/notifications/api';
+import {
+  assertRateLimit,
+  sanitizeText,
+  validateDisplayName,
+  validateEmailStrict,
+  validatePasswordStrict,
+  validateUsernameStrict,
+} from '@/lib/security';
 import { supabase } from '@/lib/supabase';
 
 export class AppError extends Error {}
 
-const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export function validateUsername(value: string): string | null {
-  const username = value.trim().toLowerCase();
-  if (!username) return 'Elige un nombre de usuario.';
-  if (!USERNAME_RE.test(username)) {
-    return 'Entre 3 y 20 caracteres: letras minúsculas, números, punto o guion bajo.';
-  }
-  return null;
+  return validateUsernameStrict(value);
 }
 
 export function validateEmail(value: string): string | null {
-  if (!EMAIL_RE.test(value.trim())) return 'Escribe un correo válido.';
-  return null;
+  return validateEmailStrict(value);
 }
 
-export function validatePassword(value: string): string | null {
-  if (value.length < 6) return 'La contraseña necesita al menos 6 caracteres.';
-  return null;
+export function validatePassword(value: string, isSignup = true): string | null {
+  return validatePasswordStrict(value, isSignup);
 }
 
 export function normalizeUsername(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, '');
+  return sanitizeText(value, 30).toLowerCase().replace(/\s+/g, '');
 }
 
 export async function isUsernameAvailable(username: string): Promise<boolean> {
+  const clean = normalizeUsername(username);
+  const problem = validateUsernameStrict(clean);
+  if (problem) return false;
+
   const { data, error } = await supabase.rpc('is_username_available', {
-    uname: normalizeUsername(username),
+    uname: clean,
   });
   if (error) throw new AppError('No pudimos comprobar el usuario. Revisa tu conexión.');
   return Boolean(data);
 }
 
 export async function signInWithIdentifier(identifier: string, password: string): Promise<void> {
-  const value = identifier.trim();
+  const value = sanitizeText(identifier, 254);
   if (!value || !password) throw new AppError('Escribe tu usuario y contraseña.');
+
+  // Rate limiting anti-fuerza bruta: máximo 5 intentos por minuto por identificador
+  assertRateLimit(
+    `login:${value.toLowerCase()}`,
+    5,
+    60_000,
+    'Demasiados intentos de inicio de sesión.',
+  );
 
   let email = value;
 
@@ -64,17 +74,35 @@ export async function signUp(input: {
   username: string;
   displayName: string;
 }): Promise<void> {
+  const email = sanitizeText(input.email, 254).toLowerCase();
   const username = normalizeUsername(input.username);
+  const displayName = sanitizeText(input.displayName, 60);
+
+  // Validación estricta de todos los campos
+  const emailProblem = validateEmailStrict(email);
+  if (emailProblem) throw new AppError(emailProblem);
+
+  const usernameProblem = validateUsernameStrict(username);
+  if (usernameProblem) throw new AppError(usernameProblem);
+
+  const passwordProblem = validatePasswordStrict(input.password, true);
+  if (passwordProblem) throw new AppError(passwordProblem);
+
+  const nameProblem = validateDisplayName(displayName);
+  if (nameProblem) throw new AppError(nameProblem);
+
+  // Rate limit para registro de cuentas: máx 3 registros por cada 5 minutos por cliente
+  assertRateLimit('auth:signup', 3, 300_000, 'Demasiados intentos de registro.');
 
   if (!(await isUsernameAvailable(username))) {
-    throw new AppError('Ese nombre de usuario ya está en uso.');
+    throw new AppError('Ese nombre de usuario ya está en uso. No pueden existir nombres de usuario repetidos.');
   }
 
   const { data, error } = await supabase.auth.signUp({
-    email: input.email.trim().toLowerCase(),
+    email,
     password: input.password,
     options: {
-      data: { username, display_name: input.displayName.trim() || username },
+      data: { username, display_name: displayName },
     },
   });
 
@@ -82,8 +110,8 @@ export async function signUp(input: {
     if (/already registered|already exists/i.test(error.message)) {
       throw new AppError('Ese correo ya tiene una cuenta. Inicia sesión.');
     }
-    if (/duplicate|unique/i.test(error.message)) {
-      throw new AppError('Ese nombre de usuario ya está en uso.');
+    if (/duplicate|unique|username_taken|Database error saving new user/i.test(error.message)) {
+      throw new AppError('Ese nombre de usuario ya está en uso. No pueden existir nombres de usuario repetidos.');
     }
     throw new AppError('No pudimos crear la cuenta. Inténtalo de nuevo.');
   }
@@ -94,8 +122,11 @@ export async function signUp(input: {
 }
 
 export async function requestPasswordReset(identifier: string): Promise<void> {
-  const value = identifier.trim();
+  const value = sanitizeText(identifier, 254);
   if (!value) throw new AppError('Escribe tu usuario o correo.');
+
+  // Rate limit: máx 3 solicitudes en 5 minutos
+  assertRateLimit('auth:reset_password', 3, 300_000, 'Demasiadas solicitudes de restablecimiento.');
 
   let email: string | null = value.includes('@') ? value : null;
 
@@ -118,7 +149,7 @@ export async function requestPasswordReset(identifier: string): Promise<void> {
 }
 
 export async function updatePassword(password: string): Promise<void> {
-  const problem = validatePassword(password);
+  const problem = validatePasswordStrict(password, true);
   if (problem) throw new AppError(problem);
 
   const { error } = await supabase.auth.updateUser({ password });

@@ -159,3 +159,17 @@ export type CallLogItem = {
     avatar_path: string | null;
   } | null;
 };
+
+export type FriendRequestStatus = 'pending' | 'accepted' | 'rejected';
+
+export type FriendRequestItem = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  pair_key: string;
+  status: FriendRequestStatus;
+  created_at: string;
+  updated_at: string;
+  other: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path' | 'about'>;
+  direction: 'incoming' | 'outgoing';
+};

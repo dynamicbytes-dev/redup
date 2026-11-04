@@ -6,9 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   View,
 } from 'react-native';
@@ -42,6 +40,7 @@ import { setActiveConversationId } from '@/features/notifications/api';
 import { isMutedUntil, isSameMessageDay, mutePresetIso, relativeLastSeen } from '@/lib/format';
 import { queryKeys } from '@/lib/query-client';
 import type { ChatMessage } from '@/lib/types';
+import { useKeyboardHeight } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
 
 type Row =
@@ -54,6 +53,7 @@ export default function ChatScreen() {
 
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const queryClient = useQueryClient();
   const { userId, profile, privacy, globalOnlineIds } = useSession();
 
@@ -440,9 +440,7 @@ export default function ChatScreen() {
         </View>
       </SafeAreaView>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={{ flex: 1, paddingBottom: keyboardHeight }}>
         {messagesQuery.isLoading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={colors.primary} />
@@ -451,6 +449,7 @@ export default function ChatScreen() {
           <FlatList
             data={rows}
             inverted
+            keyboardShouldPersistTaps="handled"
             keyExtractor={(item) => item.key}
             contentContainerStyle={{ paddingVertical: 12, flexGrow: 1 }}
             onEndReached={() => {
@@ -546,9 +545,9 @@ export default function ChatScreen() {
           onSend={handleSend}
           onSendMedia={handleSendMedia}
           onTyping={notifyTyping}
-          bottomInset={insets.bottom}
+          bottomInset={keyboardHeight > 0 ? 6 : insets.bottom}
         />
-      </KeyboardAvoidingView>
+      </View>
 
       <ActionSheet
         visible={Boolean(selected)}

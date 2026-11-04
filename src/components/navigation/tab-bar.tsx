@@ -3,7 +3,9 @@ import type { BottomTabBarProps } from 'expo-router/tabs';
 
 import { AppText } from '@/components/ui/app-text';
 import { Icon, type IconName } from '@/components/ui/icon';
+import { useSession } from '@/features/auth/session';
 import { useConversations } from '@/features/chats/hooks';
+import { useFriendRequests, useFriendsRealtime } from '@/features/friends/hooks';
 import { useTheme } from '@/theme';
 
 type TabConfig = {
@@ -14,6 +16,7 @@ type TabConfig = {
 
 const TABS: Record<string, TabConfig> = {
   chats: { label: 'Chats', icon: 'chatbubbles-outline', activeIcon: 'chatbubbles' },
+  friends: { label: 'Amigos', icon: 'people-outline', activeIcon: 'people' },
   status: { label: 'Estados', icon: 'aperture-outline', activeIcon: 'aperture' },
   calls: { label: 'Llamadas', icon: 'call-outline', activeIcon: 'call' },
   settings: { label: 'Ajustes', icon: 'settings-outline', activeIcon: 'settings' },
@@ -21,9 +24,13 @@ const TABS: Record<string, TabConfig> = {
 
 export function RedupTabBar({ state, navigateToTab, insets }: BottomTabBarProps) {
   const { colors } = useTheme();
+  const { userId } = useSession();
   const { data: conversations } = useConversations();
+  useFriendsRealtime(Boolean(userId));
+  const { incoming } = useFriendRequests(userId);
 
   const unread = (conversations ?? []).reduce((total, item) => total + item.unread_count, 0);
+  const pendingFriends = incoming.length;
 
   return (
     <View
@@ -40,7 +47,9 @@ export function RedupTabBar({ state, navigateToTab, insets }: BottomTabBarProps)
         if (!config) return null;
 
         const focused = state.index === index;
-        const showBadge = route.name === 'chats' && unread > 0;
+        const badgeCount =
+          route.name === 'chats' ? unread : route.name === 'friends' ? pendingFriends : 0;
+        const showBadge = badgeCount > 0;
 
         return (
           <Pressable
@@ -88,7 +97,7 @@ export function RedupTabBar({ state, navigateToTab, insets }: BottomTabBarProps)
                     borderColor: colors.bgElevated,
                   }}>
                   <AppText style={{ color: '#FFFFFF', fontSize: 9.5, fontWeight: '700' }}>
-                    {unread > 99 ? '99+' : unread}
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </AppText>
                 </View>
               ) : null}

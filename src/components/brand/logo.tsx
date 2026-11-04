@@ -4,6 +4,9 @@ import { AppText } from '@/components/ui/app-text';
 import { brand } from '@/theme/tokens';
 
 export function Logo({ size = 60 }: { size?: number }) {
+  const glyphSize = Math.round(size * 0.54);
+  const glyphLineHeight = Math.round(glyphSize * 1.18);
+
   return (
     <View
       style={{
@@ -17,10 +20,11 @@ export function Logo({ size = 60 }: { size?: number }) {
       <AppText
         style={{
           color: '#FFFFFF',
-          fontSize: size * 0.54,
+          fontSize: glyphSize,
+          lineHeight: glyphLineHeight,
           fontWeight: '800',
           letterSpacing: -1,
-          marginTop: -size * 0.04,
+          includeFontPadding: false,
         }}>
         r
       </AppText>
@@ -40,19 +44,35 @@ export function Logo({ size = 60 }: { size?: number }) {
 }
 
 export function Wordmark({ size = 26, color }: { size?: number; color: string }) {
+  const lineHeight = Math.round(size * 1.24);
+  const dotSize = Math.max(5, Math.round(size * 0.22));
+
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-      <AppText style={{ color, fontSize: size, fontWeight: '800', letterSpacing: -0.9 }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        paddingVertical: 2,
+      }}>
+      <AppText
+        style={{
+          color,
+          fontSize: size,
+          lineHeight,
+          fontWeight: '800',
+          letterSpacing: -0.8,
+          includeFontPadding: false,
+        }}>
         redup
       </AppText>
       <View
         style={{
-          width: size * 0.22,
-          height: size * 0.22,
-          borderRadius: size * 0.11,
+          width: dotSize,
+          height: dotSize,
+          borderRadius: dotSize / 2,
           backgroundColor: brand.coral,
-          marginBottom: size * 0.1,
-          marginLeft: size * 0.06,
+          marginLeft: Math.max(2, Math.round(size * 0.06)),
+          marginBottom: Math.round(size * 0.04),
         }}
       />
     </View>

@@ -1,16 +1,11 @@
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
 import { Icon } from '@/components/ui/icon';
+import { useKeyboardAutoScroll } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
 
 type Props = {
@@ -31,18 +26,22 @@ export function AuthShell({
   center = false,
 }: Props) {
   const { colors } = useTheme();
+  const { scrollRef, keyboardHeight, onScroll, onTouchEndCapture } = useKeyboardAutoScroll();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View
+        style={{ flex: 1, paddingBottom: keyboardHeight }}
+        onTouchEndCapture={onTouchEndCapture}>
         <ScrollView
+          ref={scrollRef}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 24,
-            paddingBottom: 28,
-            justifyContent: center ? 'center' : 'flex-start',
+            paddingBottom: keyboardHeight > 0 ? 48 : 28,
+            justifyContent: center && keyboardHeight === 0 ? 'center' : 'flex-start',
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
@@ -73,7 +72,7 @@ export function AuthShell({
           <View style={{ flex: 1 }} />
           {footer ? <View style={{ marginTop: 24 }}>{footer}</View> : null}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }

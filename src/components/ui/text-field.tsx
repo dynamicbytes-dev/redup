@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Pressable, TextInput, View, type TextInputProps } from 'react-native';
 
+import { notifyInputFocused } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
 
 import { AppText } from './app-text';
@@ -47,6 +48,7 @@ export function TextField({ label, error, icon, right, style, ...rest }: Props) 
           {...rest}
           onFocus={(e) => {
             setFocused(true);
+            notifyInputFocused();
             rest.onFocus?.(e);
           }}
           onBlur={(e) => {

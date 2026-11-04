@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,8 +13,12 @@ import { TextField } from '@/components/ui/text-field';
 import { isUsernameAvailable, normalizeUsername, validateUsername } from '@/features/auth/api';
 import { useSession } from '@/features/auth/session';
 import { pickAvatarImage, updateProfile, uploadAvatar } from '@/features/profile/api';
+import { validateAboutText, validateDisplayName } from '@/lib/security';
 import type { Profile } from '@/lib/types';
+import { useKeyboardAutoScroll } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
+
+type UsernameStatus = 'same' | 'checking' | 'ok' | 'taken' | 'invalid';
 
 export default function ProfileScreen() {
   const { profile } = useSession();
@@ -27,14 +31,47 @@ export default function ProfileScreen() {
 function ProfileEditor({ profile }: { profile: Profile }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { scrollRef, keyboardHeight, onScroll, onTouchEndCapture } = useKeyboardAutoScroll();
   const { userId, refreshProfile } = useSession();
 
   const [displayName, setDisplayName] = useState(profile.display_name);
   const [username, setUsername] = useState(profile.username);
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('same');
   const [about, setAbout] = useState(profile.about ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Verificación en tiempo real de unicidad del nombre de usuario al editar perfil
+  useEffect(() => {
+    const clean = normalizeUsername(username);
+    if (clean === profile.username.toLowerCase()) {
+      return;
+    }
+    if (validateUsername(clean)) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setUsernameStatus('checking');
+      try {
+        const available = await isUsernameAvailable(clean);
+        if (!cancelled) {
+          setUsernameStatus(available ? 'ok' : 'taken');
+        }
+      } catch {
+        if (!cancelled) {
+          setUsernameStatus('same');
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [username, profile.username]);
 
   async function changeAvatar() {
     if (!userId) return;
@@ -56,18 +93,31 @@ function ProfileEditor({ profile }: { profile: Profile }) {
     if (!userId) return;
     setError(null);
 
-    if (!displayName.trim()) return setError('Escribe tu nombre.');
+    const nameProblem = validateDisplayName(displayName);
+    if (nameProblem) return setError(nameProblem);
 
     const normalized = normalizeUsername(username);
     const problem = validateUsername(normalized);
     if (problem) return setError(problem);
 
+    const aboutProblem = validateAboutText(about);
+    if (aboutProblem) return setError(aboutProblem);
+
+    if (usernameStatus === 'taken') {
+      return setError(
+        'Ese nombre de usuario ya está en uso. No pueden existir nombres de usuario repetidos.',
+      );
+    }
+
     setBusy(true);
     try {
-      if (normalized !== profile.username) {
+      if (normalized !== profile.username.toLowerCase()) {
         const available = await isUsernameAvailable(normalized);
         if (!available) {
-          setError('Ese nombre de usuario ya está en uso.');
+          setUsernameStatus('taken');
+          setError(
+            'Ese nombre de usuario ya está en uso. No pueden existir nombres de usuario repetidos.',
+          );
           return;
         }
       }
@@ -85,6 +135,13 @@ function ProfileEditor({ profile }: { profile: Profile }) {
       setBusy(false);
     }
   }
+
+  const usernameFieldError =
+    usernameStatus === 'taken'
+      ? 'Ese nombre de usuario ya está en uso. Elige otro.'
+      : usernameStatus === 'invalid'
+        ? validateUsername(username)
+        : null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
@@ -105,7 +162,15 @@ function ProfileEditor({ profile }: { profile: Profile }) {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 30, gap: 18 }}
+        ref={scrollRef}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        onTouchEndCapture={onTouchEndCapture}
+        contentContainerStyle={{
+          padding: 20,
+          paddingBottom: insets.bottom + keyboardHeight + 48,
+          gap: 18,
+        }}
         keyboardShouldPersistTaps="handled">
         <View style={{ alignItems: 'center', gap: 10 }}>
           <Pressable onPress={changeAvatar} disabled={uploading}>
@@ -150,13 +215,33 @@ function ProfileEditor({ profile }: { profile: Profile }) {
         />
 
         <TextField
-          label="Nombre de usuario"
+          label="Nombre de usuario (único)"
           icon="at-outline"
           autoCapitalize="none"
           autoCorrect={false}
           value={username}
-          onChangeText={setUsername}
+          onChangeText={(value) => {
+            const clean = value.toLowerCase().replace(/\s+/g, '');
+            setUsername(clean);
+            if (clean === profile.username.toLowerCase()) {
+              setUsernameStatus('same');
+            } else if (validateUsername(clean)) {
+              setUsernameStatus('invalid');
+            } else {
+              setUsernameStatus('checking');
+            }
+          }}
           maxLength={20}
+          error={usernameFieldError}
+          right={
+            usernameStatus === 'checking' ? (
+              <Icon name="ellipsis-horizontal" size={18} color={colors.textFaint} />
+            ) : usernameStatus === 'ok' ? (
+              <Icon name="checkmark-circle" size={20} color="#2BD67B" />
+            ) : usernameStatus === 'taken' ? (
+              <Icon name="close-circle" size={20} color={colors.danger} />
+            ) : null
+          }
         />
 
         <TextField
@@ -173,7 +258,18 @@ function ProfileEditor({ profile }: { profile: Profile }) {
           {normalizeUsername(username) || 'usuario'}
         </AppText>
 
-        <Button title="Guardar cambios" size="lg" onPress={save} loading={busy} disabled={busy} />
+        <Button
+          title="Guardar cambios"
+          size="lg"
+          onPress={save}
+          loading={busy}
+          disabled={
+            busy ||
+            usernameStatus === 'taken' ||
+            usernameStatus === 'invalid' ||
+            usernameStatus === 'checking'
+          }
+        />
 
         <Pressable
           onPress={() =>

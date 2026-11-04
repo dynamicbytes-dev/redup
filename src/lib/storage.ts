@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 
+import { normalizeLocalSupabaseUrl } from './env';
 import { supabase } from './supabase';
 
 export function avatarUrl(path: string | null | undefined): string | null {
   if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  if (path.startsWith('http')) return normalizeLocalSupabaseUrl(path);
+  return normalizeLocalSupabaseUrl(
+    supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl,
+  );
 }
 
 const signedCache = new Map<string, { url: string; expiresAt: number }>();
@@ -31,12 +34,14 @@ export async function signedMediaUrl(path: string | null | undefined, expiresIn 
   const { data, error } = await supabase.storage.from('media').createSignedUrl(path, expiresIn);
   if (error || !data?.signedUrl) return null;
 
+  const normalizedUrl = normalizeLocalSupabaseUrl(data.signedUrl);
+
   signedCache.set(path, {
-    url: data.signedUrl,
+    url: normalizedUrl,
     expiresAt: Date.now() + (expiresIn - 120) * 1000,
   });
 
-  return data.signedUrl;
+  return normalizedUrl;
 }
 
 /** Hook que resuelve y memoriza la URL firmada de un archivo en `media`. */

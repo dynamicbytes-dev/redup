@@ -2,6 +2,13 @@ import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
+import {
+  assertRateLimit,
+  sanitizeText,
+  validateAboutText,
+  validateDisplayName,
+  validateUsernameStrict,
+} from '@/lib/security';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
 
@@ -62,20 +69,53 @@ export async function updateProfile(
   userId: string,
   input: { display_name: string; username: string; about: string | null },
 ): Promise<Profile> {
+  const cleanDisplayName = sanitizeText(input.display_name, 60);
+  const cleanUsername = sanitizeText(input.username, 30).toLowerCase().replace(/\s+/g, '');
+  const cleanAbout = input.about ? sanitizeText(input.about, 139) : null;
+
+  // Validación estricta de inputs
+  const nameProblem = validateDisplayName(cleanDisplayName);
+  if (nameProblem) throw new ProfileError(nameProblem);
+
+  const usernameProblem = validateUsernameStrict(cleanUsername);
+  if (usernameProblem) throw new ProfileError(usernameProblem);
+
+  const aboutProblem = validateAboutText(cleanAbout);
+  if (aboutProblem) throw new ProfileError(aboutProblem);
+
+  // Anti-bot rate limit: máx 10 actualizaciones de perfil cada minuto por usuario
+  assertRateLimit(`profile:${userId}`, 10, 60_000, 'Demasiados cambios de perfil en poco tiempo.');
+
+  // Comprobar que ningún otro perfil tenga ya este username
+  const { data: conflict } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('username', cleanUsername)
+    .neq('id', userId)
+    .maybeSingle();
+
+  if (conflict) {
+    throw new ProfileError(
+      'Ese nombre de usuario ya está en uso. No pueden existir nombres de usuario repetidos.',
+    );
+  }
+
   const { data, error } = await supabase
     .from('profiles')
     .update({
-      display_name: input.display_name.trim(),
-      username: input.username.trim().toLowerCase(),
-      about: input.about?.trim() || null,
+      display_name: cleanDisplayName,
+      username: cleanUsername,
+      about: cleanAbout,
     })
     .eq('id', userId)
     .select('id, username, display_name, avatar_path, about, last_seen_at, created_at')
     .single();
 
   if (error) {
-    if (/duplicate|unique/i.test(error.message)) {
-      throw new ProfileError('Ese nombre de usuario ya está en uso.');
+    if (/duplicate|unique|23505/i.test(`${error.code ?? ''} ${error.message}`)) {
+      throw new ProfileError(
+        'Ese nombre de usuario ya está en uso. No pueden existir nombres de usuario repetidos.',
+      );
     }
     throw new ProfileError('No pudimos guardar los cambios.');
   }

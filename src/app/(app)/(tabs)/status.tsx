@@ -3,9 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -25,6 +23,7 @@ import { Screen } from '@/components/ui/screen';
 import { useSession } from '@/features/auth/session';
 import { useContactsMap } from '@/features/chats/hooks';
 import { pickChatImageFromCamera, pickChatImageFromLibrary } from '@/features/chats/media';
+import { useFriendRequests } from '@/features/friends/hooks';
 import {
   useCreateImageStatus,
   useCreateTextStatus,
@@ -36,6 +35,7 @@ import {
 import { formatListTime, formatMessageTime } from '@/lib/format';
 import { avatarUrl } from '@/lib/storage';
 import type { StatusAuthorGroup, StatusItem } from '@/lib/types';
+import { useKeyboardHeight } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
 
 const STATUS_COLORS = [
@@ -54,6 +54,7 @@ export default function StatusScreen() {
 
   const statusesQuery = useStatuses(userId);
   const contactsMapQuery = useContactsMap(userId);
+  const friendsQuery = useFriendRequests(userId);
   useStatusesRealtime(Boolean(userId));
 
   const authorSummary = useMemo(
@@ -90,6 +91,11 @@ export default function StatusScreen() {
   const { myGroup, recentGroups, viewedGroups, groupsByUser } = useMemo(() => {
     const byUser = new Map<string, StatusItem[]>();
     for (const item of allStatuses) {
+      const isMe = item.user_id === userId;
+      const isAcceptedFriend =
+        friendsQuery.byUserId.get(item.user_id)?.status === 'accepted';
+      if (!isMe && !isAcceptedFriend) continue;
+
       const list = byUser.get(item.user_id) ?? [];
       list.push(item);
       byUser.set(item.user_id, list);
@@ -144,7 +150,7 @@ export default function StatusScreen() {
       viewedGroups: viewed,
       groupsByUser: map,
     };
-  }, [allStatuses, userId, contactsMap, profile]);
+  }, [allStatuses, userId, contactsMap, profile, friendsQuery.byUserId]);
 
   const activeGroup = viewerTarget ? (groupsByUser.get(viewerTarget.groupUserId) ?? null) : null;
 
@@ -329,8 +335,8 @@ export default function StatusScreen() {
             <View style={{ paddingTop: 28 }}>
               <EmptyState
                 icon="aperture-outline"
-                title="Sin estados de contactos"
-                description="Los estados desaparecen a las 24 horas. Comparte el primero con el botón de abajo."
+                title="Sin estados de tus amigos"
+                description="Solo puedes ver las historias de los perfiles que tienes agregados como amigos. Los estados duran 24 horas."
               />
             </View>
           ) : (
@@ -587,6 +593,7 @@ function TextStatusComposerModal({
   onPublish: (caption: string, bgColor: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const [text, setText] = useState('');
   const [colorIndex, setColorIndex] = useState(0);
 
@@ -606,9 +613,7 @@ function TextStatusComposerModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: bgColor }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={{ flex: 1, backgroundColor: bgColor, paddingBottom: keyboardHeight }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <View
             style={{
@@ -717,7 +722,7 @@ function TextStatusComposerModal({
             </Pressable>
           </View>
         </SafeAreaView>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -735,15 +740,14 @@ function ImageStatusComposerModal({
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const keyboardHeight = useKeyboardHeight();
   const [caption, setCaption] = useState('');
 
   if (!uri) return null;
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: '#07060C' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={{ flex: 1, backgroundColor: '#07060C', paddingBottom: keyboardHeight }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <View
             style={{
@@ -820,7 +824,7 @@ function ImageStatusComposerModal({
             </Pressable>
           </View>
         </SafeAreaView>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

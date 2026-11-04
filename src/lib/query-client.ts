@@ -24,5 +24,6 @@ export const queryKeys = {
   statuses: ['statuses'] as const,
   calls: ['calls'] as const,
   call: (id: string) => ['call', id] as const,
+  friends: ['friends'] as const,
   userSearch: (term: string) => ['user-search', term] as const,
 };

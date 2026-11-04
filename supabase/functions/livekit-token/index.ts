@@ -3,6 +3,7 @@
 // tras verificar que el usuario autenticado pertenece a la conversación.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { securityResponse } from '../_shared/security-headers.ts';
 
 function base64UrlEncode(input: Uint8Array | string): string {
   const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
@@ -56,10 +57,7 @@ Deno.serve(async (req: Request) => {
     } = await client.auth.getUser();
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return securityResponse({ error: 'unauthorized' }, { status: 401 });
     }
 
     const body = (await req.json()) as {
@@ -69,10 +67,7 @@ Deno.serve(async (req: Request) => {
     };
 
     if (!body.conversationId || !body.roomName) {
-      return new Response(JSON.stringify({ error: 'missing_params' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return securityResponse({ error: 'missing_params' }, { status: 400 });
     }
 
     const { data: membership } = await client
@@ -83,22 +78,16 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (!membership) {
-      return new Response(JSON.stringify({ error: 'forbidden' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return securityResponse({ error: 'forbidden' }, { status: 403 });
     }
 
     if (!livekitApiKey || !livekitApiSecret || !livekitUrl) {
-      return new Response(
-        JSON.stringify({
-          configured: false,
-          url: null,
-          token: null,
-          roomName: body.roomName,
-        }),
-        { headers: { 'Content-Type': 'application/json' } },
-      );
+      return securityResponse({
+        configured: false,
+        url: null,
+        token: null,
+        roomName: body.roomName,
+      });
     }
 
     const nowSec = Math.floor(Date.now() / 1000);
@@ -119,20 +108,14 @@ Deno.serve(async (req: Request) => {
 
     const token = await signLiveKitJwt(jwtPayload, livekitApiSecret);
 
-    return new Response(
-      JSON.stringify({
-        configured: true,
-        url: livekitUrl,
-        token,
-        roomName: body.roomName,
-      }),
-      { headers: { 'Content-Type': 'application/json' } },
-    );
-  } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
+    return securityResponse({
+      configured: true,
+      url: livekitUrl,
+      token,
+      roomName: body.roomName,
     });
+  } catch (err) {
+    return securityResponse({ error: String(err) }, { status: 500 });
   }
 });
 

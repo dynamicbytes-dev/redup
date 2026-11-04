@@ -100,4 +100,11 @@ begin
     ('ffffffff-ffff-4fff-8fff-ffffffffff02', conv, ana,  luis, 'video', 'missed',    'redup-conv-seed-2', now() - interval '95 minutes', null, now() - interval '94 minutes', 0),
     ('ffffffff-ffff-4fff-8fff-ffffffffff03', grp,  sofia, null,'voice', 'completed', 'redup-grp-seed-3',  now() - interval '35 minutes', now() - interval '35 minutes' + interval '4 seconds', now() - interval '28 minutes', 416)
   on conflict (id) do nothing;
+
+  -- amistades y solicitudes de ejemplo
+  insert into public.friend_requests (id, sender_id, receiver_id, pair_key, status, created_at, updated_at)
+  values
+    ('99999999-9999-4999-8999-999999999901', luis,  ana,  least(ana, luis)::text || ':' || greatest(ana, luis)::text,   'accepted', now() - interval '2 days', now() - interval '2 days'),
+    ('99999999-9999-4999-8999-999999999902', sofia, ana,  least(ana, sofia)::text || ':' || greatest(ana, sofia)::text, 'pending',  now() - interval '25 minutes', now() - interval '25 minutes')
+  on conflict (pair_key) do nothing;
 end $$;

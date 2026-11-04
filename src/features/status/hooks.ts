@@ -22,6 +22,8 @@ export function useStatuses(userId: string | null) {
   });
 }
 
+let statusesChannelSeq = 0;
+
 export function useStatusesRealtime(enabled: boolean) {
   const queryClient = useQueryClient();
 
@@ -29,7 +31,7 @@ export function useStatusesRealtime(enabled: boolean) {
     if (!enabled) return;
 
     const channel = supabase
-      .channel('statuses-feed')
+      .channel(`statuses-feed-${++statusesChannelSeq}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'statuses' },

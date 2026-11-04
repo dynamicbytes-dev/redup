@@ -56,7 +56,8 @@
           "color": "#5B4BE8"
         }
       ],
-      "./plugins/with-android-sdk"
+      "./plugins/with-android-sdk",
+      "expo-secure-store"
     ],
     "experiments": {
       "reactCompiler": true

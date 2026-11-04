@@ -3,7 +3,7 @@ import { Redirect, Stack } from 'expo-router';
 import { useSession } from '@/features/auth/session';
 
 export const unstable_settings = {
-  initialRouteName: 'welcome',
+  anchor: 'welcome',
 };
 
 export default function AuthLayout() {

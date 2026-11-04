@@ -4,6 +4,7 @@ import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { compressToJpeg } from '@/features/profile/api';
+import { assertRateLimit, validateStatusCaption } from '@/lib/security';
 import { supabase } from '@/lib/supabase';
 import type { StatusItem, StatusViewer } from '@/lib/types';
 
@@ -120,8 +121,11 @@ export async function createTextStatus(input: {
   caption: string;
   bgColor: string;
 }): Promise<void> {
-  const clean = input.caption.trim();
-  if (!clean) throw new StatusError('Escribe algo para tu estado.');
+  const { clean, error: valError } = validateStatusCaption(input.caption);
+  if (valError) throw new StatusError(valError);
+
+  // Anti-bot rate limit: máx 5 estados cada minuto
+  assertRateLimit(`status:${input.userId}`, 5, 60_000, 'Estás publicando estados demasiado rápido.');
 
   const id = Crypto.randomUUID();
   const createdAt = new Date();
@@ -181,7 +185,15 @@ export async function createImageStatus(input: {
 
   const createdAt = new Date();
   const expiresAt = new Date(createdAt.getTime() + 24 * 3600 * 1000);
-  const cleanCaption = input.caption?.trim() ? input.caption.trim() : null;
+  let cleanCaption: string | null = null;
+  if (input.caption?.trim()) {
+    const { clean, error: captionErr } = validateStatusCaption(input.caption);
+    if (captionErr) throw new StatusError(captionErr);
+    cleanCaption = clean;
+  }
+
+  // Anti-bot rate limit: máx 5 estados cada minuto
+  assertRateLimit(`status:${input.userId}`, 5, 60_000, 'Estás publicando estados demasiado rápido.');
 
   const { error } = await supabase.from('statuses').insert({
     id,

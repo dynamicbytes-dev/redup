@@ -9,16 +9,27 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Icon } from '@/components/ui/icon';
 import { TextField } from '@/components/ui/text-field';
+import { useSession } from '@/features/auth/session';
 import { useStartDirectChat, useUserSearch } from '@/features/chats/hooks';
+import {
+  useFriendRequests,
+  useRespondFriendRequest,
+  useSendFriendRequest,
+} from '@/features/friends/hooks';
 import type { UserSearchResult } from '@/lib/types';
 import { useTheme } from '@/theme';
 
 export default function NewChatScreen() {
   const { colors } = useTheme();
+  const { userId } = useSession();
   const [term, setTerm] = useState('');
   const [debounced, setDebounced] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const start = useStartDirectChat();
+  const friendsQuery = useFriendRequests(userId);
+  const sendRequest = useSendFriendRequest();
+  const respondRequest = useRespondFriendRequest();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(term), 280);
@@ -26,10 +37,11 @@ export default function NewChatScreen() {
   }, [term]);
 
   const search = useUserSearch(debounced);
+  const isSearching = debounced.trim().length >= 2;
 
-  function open(user: UserSearchResult) {
+  function openChat(targetUserId: string) {
     setErrorMessage(null);
-    start.mutate(user.id, {
+    start.mutate(targetUserId, {
       onSuccess: (conversationId) => {
         router.replace(`/chat/${conversationId}`);
       },
@@ -40,6 +52,44 @@ export default function NewChatScreen() {
       },
     });
   }
+
+  function requestFriendship(targetUserId: string) {
+    setErrorMessage(null);
+    sendRequest.mutate(targetUserId, {
+      onError: (error) => {
+        setErrorMessage(
+          error instanceof Error ? error.message : 'No pudimos enviar la solicitud.',
+        );
+      },
+    });
+  }
+
+  function acceptAndChat(requestId: string, targetUserId: string) {
+    setErrorMessage(null);
+    respondRequest.mutate(
+      { requestId, accept: true },
+      {
+        onSuccess: () => {
+          openChat(targetUserId);
+        },
+        onError: (error) => {
+          setErrorMessage(
+            error instanceof Error ? error.message : 'No pudimos aceptar la solicitud.',
+          );
+        },
+      },
+    );
+  }
+
+  const friendUsers: UserSearchResult[] = friendsQuery.friends.map((item) => ({
+    id: item.other.id,
+    username: item.other.username,
+    display_name: item.other.display_name,
+    avatar_path: item.other.avatar_path,
+    about: item.other.about,
+  }));
+
+  const listData = isSearching ? (search.data ?? []) : friendUsers;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
@@ -62,7 +112,7 @@ export default function NewChatScreen() {
       <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
         <TextField
           icon="search-outline"
-          placeholder="Busca por usuario o nombre"
+          placeholder="Busca amigos o personas por @usuario"
           autoCapitalize="none"
           autoCorrect={false}
           value={term}
@@ -107,59 +157,161 @@ export default function NewChatScreen() {
       </View>
 
       <FlatList
-        data={search.data ?? []}
+        data={listData}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 20, flexGrow: 1 }}
         ListHeaderComponent={
-          debounced.trim().length >= 2 && (search.data?.length ?? 0) > 0 ? (
+          listData.length > 0 ? (
             <AppText
               variant="micro"
               color={colors.textFaint}
               style={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 8 }}>
-              {search.data?.length} resultado{(search.data?.length ?? 0) === 1 ? '' : 's'}
+              {isSearching
+                ? `${listData.length} resultado${listData.length === 1 ? '' : 's'}`
+                : `Tus amigos (${listData.length})`}
             </AppText>
           ) : undefined
         }
         renderItem={({ item }) => {
-          const busy = start.isPending && start.variables === item.id;
+          const relation = friendsQuery.byUserId.get(item.id);
+          const isFriend = relation?.status === 'accepted';
+          const busyChat = start.isPending && start.variables === item.id;
+          const busySend = sendRequest.isPending && sendRequest.variables === item.id;
+          const busyAccept =
+            respondRequest.isPending && respondRequest.variables?.requestId === relation?.id;
+
           return (
             <Pressable
-              onPress={() => open(item)}
-              disabled={start.isPending}
+              onPress={() => {
+                if (isFriend) openChat(item.id);
+              }}
+              disabled={!isFriend || start.isPending}
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
                 paddingHorizontal: 20,
                 paddingVertical: 10,
-                backgroundColor: pressed ? colors.surface : 'transparent',
+                backgroundColor: pressed && isFriend ? colors.surface : 'transparent',
               })}>
               <Avatar name={item.display_name} uri={item.avatar_path} size={48} />
               <View style={{ flex: 1 }}>
                 <AppText variant="bodyStrong" style={{ fontSize: 16 }}>
                   {item.display_name}
                 </AppText>
-                <AppText variant="caption" color={colors.textMuted}>
+                <AppText variant="caption" color={colors.textMuted} numberOfLines={1}>
                   @{item.username}
                   {item.about ? ` · ${item.about}` : ''}
                 </AppText>
               </View>
-              {busy ? (
-                <ActivityIndicator color={colors.primary} />
+
+              {isFriend ? (
+                busyChat ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Pressable
+                    onPress={() => openChat(item.id)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderRadius: 12,
+                      backgroundColor: colors.primarySoft,
+                    }}>
+                    <Icon name="chatbubble-outline" size={16} color={colors.primary} />
+                    <AppText variant="caption" color={colors.primary} style={{ fontWeight: '700' }}>
+                      Conversar
+                    </AppText>
+                  </Pressable>
+                )
+              ) : relation?.status === 'pending' && relation.direction === 'incoming' ? (
+                <Pressable
+                  onPress={() => acceptAndChat(relation.id, item.id)}
+                  disabled={busyAccept}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 12,
+                    backgroundColor: colors.primary,
+                  }}>
+                  {busyAccept ? (
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
+                  ) : (
+                    <>
+                      <Icon name="checkmark" size={15} color={colors.onPrimary} />
+                      <AppText
+                        variant="caption"
+                        color={colors.onPrimary}
+                        style={{ fontWeight: '700' }}>
+                        Aceptar
+                      </AppText>
+                    </>
+                  )}
+                </Pressable>
+              ) : relation?.status === 'pending' && relation.direction === 'outgoing' ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 11,
+                    paddingVertical: 6,
+                    borderRadius: 12,
+                    backgroundColor: colors.surfaceAlt,
+                  }}>
+                  <Icon name="time-outline" size={14} color={colors.textMuted} />
+                  <AppText variant="caption" color={colors.textMuted} style={{ fontWeight: '600' }}>
+                    Pendiente
+                  </AppText>
+                </View>
               ) : (
-                <Icon name="chatbubble-outline" size={20} color={colors.primary} />
+                <Pressable
+                  onPress={() => requestFriendship(item.id)}
+                  disabled={busySend}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 12,
+                    backgroundColor: colors.primary,
+                  }}>
+                  {busySend ? (
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
+                  ) : (
+                    <>
+                      <Icon name="person-add-outline" size={15} color={colors.onPrimary} />
+                      <AppText
+                        variant="caption"
+                        color={colors.onPrimary}
+                        style={{ fontWeight: '700' }}>
+                        Solicitar
+                      </AppText>
+                    </>
+                  )}
+                </Pressable>
               )}
             </Pressable>
           );
         }}
         ListEmptyComponent={
-          debounced.trim().length < 2 ? (
-            <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
-              <AppText color={colors.textMuted}>
-                Escribe al menos 2 letras para buscar personas por su nombre o @usuario.
-              </AppText>
-            </View>
+          !isSearching ? (
+            friendsQuery.isLoading ? (
+              <ActivityIndicator style={{ marginTop: 30 }} color={colors.primary} />
+            ) : (
+              <EmptyState
+                icon="people-outline"
+                title="Sin amigos agregados aún"
+                description="Para conversar con alguien primero envíale una solicitud de amistad buscándolo arriba o desde la pestaña Amigos."
+              />
+            )
           ) : search.isLoading ? (
             <ActivityIndicator style={{ marginTop: 30 }} color={colors.primary} />
           ) : (

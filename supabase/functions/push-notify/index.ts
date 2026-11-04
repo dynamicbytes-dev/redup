@@ -3,6 +3,7 @@
 // y envía notificaciones push mediante Expo Push API respetando silencios y bloqueos.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { securityResponse } from '../_shared/security-headers.ts';
 
 type WebhookPayload = {
   type?: 'INSERT';
@@ -28,9 +29,7 @@ Deno.serve(async (req: Request) => {
     const payload = (await req.json()) as WebhookPayload;
     const record = payload.record;
     if (!record || record.kind === 'system') {
-      return new Response(JSON.stringify({ skipped: true }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return securityResponse({ skipped: true });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
@@ -111,14 +110,9 @@ Deno.serve(async (req: Request) => {
     });
 
     const result = await pushResponse.json();
-    return new Response(JSON.stringify({ sent: messages.length, result }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return securityResponse({ sent: messages.length, result });
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return securityResponse({ error: String(err) }, { status: 500 });
   }
 });
 
