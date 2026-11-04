@@ -1,0 +1,161 @@
+export type Profile = {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_path: string | null;
+  about: string | null;
+  last_seen_at: string;
+  created_at: string;
+  show_online?: boolean;
+  read_receipts?: boolean;
+};
+
+export type PrivacySettings = {
+  showOnline: boolean;
+  readReceipts: boolean;
+};
+
+export type BlockedUser = {
+  blocked_id: string;
+  created_at: string;
+  profile: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path' | 'about'> | null;
+};
+
+export type ConversationType = 'direct' | 'group';
+export type MemberRole = 'member' | 'admin';
+
+export type ConversationOverview = {
+  id: string;
+  type: ConversationType;
+  name: string | null;
+  avatar_path: string | null;
+  last_message_at: string;
+  last_message_body: string | null;
+  last_message_kind: string | null;
+  last_message_sender_id: string | null;
+  last_message_created_at: string | null;
+  unread_count: number;
+  member_count: number;
+  other_user_id: string | null;
+  other_username: string | null;
+  other_display_name: string | null;
+  other_avatar_path: string | null;
+  other_last_seen_at: string | null;
+  muted_until: string | null;
+  my_role: MemberRole | null;
+  last_read_at: string;
+};
+
+export type MessageKind = 'text' | 'image' | 'audio' | 'file' | 'system';
+
+export type Message = {
+  id: string;
+  conversation_id: string;
+  sender_id: string | null;
+  kind: MessageKind;
+  body: string | null;
+  media_path: string | null;
+  media_meta: Record<string, unknown> | null;
+  duration_ms: number | null;
+  reply_to_id: string | null;
+  created_at: string;
+  edited_at: string | null;
+  deleted_at: string | null;
+};
+
+/** Mensaje con estado local (envío optimista) */
+export type ChatMessage = Message & {
+  pending?: boolean;
+  failed?: boolean;
+};
+
+export type ConversationMember = {
+  conversation_id: string;
+  user_id: string;
+  role: MemberRole;
+  joined_at: string;
+  last_read_at: string;
+  muted_until: string | null;
+  profile: Pick<
+    Profile,
+    | 'id'
+    | 'username'
+    | 'display_name'
+    | 'avatar_path'
+    | 'about'
+    | 'last_seen_at'
+    | 'show_online'
+    | 'read_receipts'
+  > | null;
+};
+
+export type ContactDetail = {
+  profile: Profile;
+  alias: string | null;
+  blocked: boolean;
+};
+
+export type UserSearchResult = {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_path: string | null;
+  about: string | null;
+};
+
+export type StatusKind = 'text' | 'image';
+
+export type StatusViewer = {
+  viewer_id: string;
+  viewed_at: string;
+  profile: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path'> | null;
+};
+
+export type StatusItem = {
+  id: string;
+  user_id: string;
+  kind: StatusKind;
+  caption: string | null;
+  bg_color: string;
+  media_path: string | null;
+  created_at: string;
+  expires_at: string;
+  author: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path'> | null;
+  viewers: StatusViewer[];
+  viewedByMe: boolean;
+};
+
+export type StatusAuthorGroup = {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarPath: string | null;
+  latestAt: string;
+  hasUnviewed: boolean;
+  items: StatusItem[];
+};
+
+export type CallKind = 'voice' | 'video';
+export type CallStatus = 'ringing' | 'ongoing' | 'completed' | 'missed' | 'declined';
+
+export type CallLogItem = {
+  id: string;
+  conversation_id: string;
+  caller_id: string;
+  callee_id: string | null;
+  kind: CallKind;
+  status: CallStatus;
+  room_name: string;
+  started_at: string;
+  answered_at: string | null;
+  ended_at: string | null;
+  duration_sec: number;
+  caller: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path'> | null;
+  callee: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path'> | null;
+  conversation: {
+    id: string;
+    type: ConversationType;
+    name: string | null;
+    avatar_path: string | null;
+  } | null;
+};
