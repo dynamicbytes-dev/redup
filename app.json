@@ -54,7 +54,8 @@
           "icon": "./assets/images/icon.png",
           "color": "#5B4BE8"
         }
-      ]
+      ],
+      "./plugins/with-android-sdk"
     ],
     "experiments": {
       "reactCompiler": true
