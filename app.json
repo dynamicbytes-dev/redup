@@ -16,6 +16,7 @@
       "package": "app.redup.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#5B4BE8",
+        "backgroundImage": "./assets/images/android-icon-background.png",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
