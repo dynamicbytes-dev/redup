@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restablece tu contraseña - Redup</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0d1117;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #e6edf3;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrapper {
+      width: 100%;
+      background-color: #0d1117;
+      padding: 40px 16px;
+    }
+    .container {
+      max-width: 520px;
+      margin: 0 auto;
+      background-color: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .header {
+      padding: 32px 32px 20px 32px;
+      text-align: center;
+      border-bottom: 1px solid #21262d;
+    }
+    .logo {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #2f81f7;
+      text-transform: lowercase;
+    }
+    .logo span {
+      color: #58a6ff;
+    }
+    .content {
+      padding: 32px;
+      line-height: 1.6;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #f0f6fc;
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+    p {
+      font-size: 15px;
+      color: #8b949e;
+      margin: 0 0 20px 0;
+    }
+    .btn-container {
+      text-align: center;
+      margin: 28px 0;
+    }
+    .btn {
+      display: inline-block;
+      background-color: #238636;
+      color: #ffffff !important;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 14px 28px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(35, 134, 54, 0.4);
+    }
+    .otp-box {
+      margin: 24px 0;
+      padding: 20px;
+      background-color: #0d1117;
+      border: 1px dashed #30363d;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .otp-label {
+      font-size: 13px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+    .otp-code {
+      font-family: 'SF Mono', Consolas, Monaco, monospace;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 8px;
+      color: #58a6ff;
+    }
+    .footer {
+      padding: 20px 32px 32px 32px;
+      border-top: 1px solid #21262d;
+      font-size: 12px;
+      color: #6e7681;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <div class="logo">red<span>up</span></div>
+      </div>
+      <div class="content">
+        <h1>Restablecimiento de contraseña</h1>
+        <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en <strong>Redup</strong>.</p>
+        
+        <div class="btn-container">
+          <a class="btn" href="{{ .ConfirmationURL }}" target="_blank">Crear nueva contraseña</a>
+        </div>
+
+        <div class="otp-box">
+          <div class="otp-label">O ingresa este código en la aplicación</div>
+          <div class="otp-code">{{ .Token }}</div>
+        </div>
+
+        <p style="font-size: 13px; color: #6e7681;">Este enlace y código son válidos durante 60 minutos. Si tú no solicitaste este cambio, puedes ignorar este correo; tu contraseña actual continuará siendo segura.</p>
+      </div>
+      <div class="footer">
+        Mensaje automático enviado por Redup Security. Por favor no respondas a este correo.
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+

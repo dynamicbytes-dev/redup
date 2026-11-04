@@ -121,30 +121,54 @@ export async function signUp(input: {
   }
 }
 
-export async function requestPasswordReset(identifier: string): Promise<void> {
-  const value = sanitizeText(identifier, 254);
-  if (!value) throw new AppError('Escribe tu usuario o correo.');
+export async function requestPasswordReset(emailInput: string): Promise<string> {
+  const email = sanitizeText(emailInput, 254).toLowerCase().trim();
+  if (!email) {
+    throw new AppError('Escribe el correo electrónico con el que te registraste.');
+  }
+
+  const problem = validateEmailStrict(email);
+  if (problem) {
+    throw new AppError('Ingresa un correo electrónico válido (el mismo con el que te registraste).');
+  }
 
   // Rate limit: máx 3 solicitudes en 5 minutos
   assertRateLimit('auth:reset_password', 3, 300_000, 'Demasiadas solicitudes de restablecimiento.');
 
-  let email: string | null = value.includes('@') ? value : null;
-
-  if (!email) {
-    const { data, error } = await supabase.rpc('resolve_login_email', {
-      uname: normalizeUsername(value),
-    });
-    if (error) throw new AppError('No pudimos buscar tu cuenta. Inténtalo de nuevo.');
-    email = (data as string | null) ?? null;
-  }
-
-  if (!email) throw new AppError('No encontramos ninguna cuenta con ese dato.');
-
   const redirectTo = Linking.createURL('reset-password');
-  const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase(), { redirectTo });
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
   if (error) {
     throw new AppError('No pudimos enviar el correo. Espera un momento e inténtalo otra vez.');
+  }
+
+  return email;
+}
+
+export async function verifyPasswordResetOtp(email: string, token: string): Promise<void> {
+  const cleanEmail = sanitizeText(email, 254).toLowerCase();
+  const cleanToken = token.trim();
+
+  if (!cleanEmail || !cleanToken) {
+    throw new AppError('Escribe tu correo y el código de 6 dígitos.');
+  }
+
+  // Rate limiting anti-fuerza bruta de OTP: máx 5 intentos en 5 minutos
+  assertRateLimit(
+    `auth:verify_otp:${cleanEmail}`,
+    5,
+    300_000,
+    'Demasiados intentos de verificación de código.',
+  );
+
+  const { error } = await supabase.auth.verifyOtp({
+    email: cleanEmail,
+    token: cleanToken,
+    type: 'recovery',
+  });
+
+  if (error) {
+    throw new AppError('El código de 6 dígitos es incorrecto o ha expirado.');
   }
 }
 

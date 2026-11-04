@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import {
   createContext,
   useCallback,
@@ -55,7 +56,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const { data: subscription } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
       setLoading(false);
-      if (event === 'SIGNED_OUT') {
+      if (event === 'PASSWORD_RECOVERY') {
+        router.replace('/reset-password');
+      } else if (event === 'SIGNED_OUT') {
         queryClient.clear();
         setPrivacy(DEFAULT_PRIVACY);
         setGlobalOnlineIds([]);
