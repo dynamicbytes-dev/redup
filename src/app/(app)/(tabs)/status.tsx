@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -849,37 +849,54 @@ function StatusViewerModal({
   const [paused, setPaused] = useState(false);
   const [viewersOpen, setViewersOpen] = useState(false);
 
+  const viewedIdsRef = useRef<Set<string>>(new Set());
+  const onViewedRef = useRef(onViewed);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onViewedRef.current = onViewed;
+    onCloseRef.current = onClose;
+  });
+
   const items = group?.items ?? [];
   const safeIndex = Math.min(index, Math.max(items.length - 1, 0));
   const current = items[safeIndex] ?? null;
+  const currentId = current?.id ?? null;
+  const currentViewedByMe = current?.viewedByMe ?? false;
   const isMine = current?.user_id === currentUserId;
 
-  // Marcar como visto al abrir un estado ajeno
+  // Marcar como visto una sola vez al abrir cada estado ajeno
   useEffect(() => {
-    if (!current || isMine || current.viewedByMe) return;
-    onViewed(current.id);
-  }, [current, isMine, onViewed]);
+    if (!currentId || isMine || currentViewedByMe) return;
+    if (viewedIdsRef.current.has(currentId)) return;
+    viewedIdsRef.current.add(currentId);
+    onViewedRef.current(currentId);
+  }, [currentId, isMine, currentViewedByMe]);
 
   // Avance automático cada 5 segundos
   useEffect(() => {
-    if (!group || !current || paused || viewersOpen) return;
+    if (!group || !currentId || paused || viewersOpen) return;
 
     const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev + 0.02 >= 1) {
-          if (safeIndex + 1 < items.length) {
-            setIndex((i) => i + 1);
-            return 0;
-          }
-          onClose();
-          return 1;
-        }
-        return prev + 0.02;
-      });
+      setProgress((prev) => Math.min(1, prev + 0.02));
     }, 100);
 
     return () => clearInterval(timer);
-  }, [group, current, paused, viewersOpen, safeIndex, items.length, onClose]);
+  }, [group, currentId, paused, viewersOpen]);
+
+  // Pasar al siguiente estado o cerrar al llegar al 100 %
+  useEffect(() => {
+    if (progress < 1 || !group || !currentId) return;
+    const timeout = setTimeout(() => {
+      if (safeIndex + 1 < items.length) {
+        setProgress(0);
+        setIndex((i) => i + 1);
+      } else {
+        onCloseRef.current();
+      }
+    }, 20);
+    return () => clearTimeout(timeout);
+  }, [progress, group, currentId, safeIndex, items.length]);
 
   if (!group || !current) return null;
 

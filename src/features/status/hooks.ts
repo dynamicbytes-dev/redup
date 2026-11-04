@@ -93,6 +93,15 @@ export function useMarkStatusViewed(viewerId: string) {
 
   return useMutation({
     mutationFn: (statusId: string) => markStatusViewed(statusId, viewerId),
+    onMutate: (statusId: string) => {
+      queryClient.setQueryData<StatusItem[]>(queryKeys.statuses, (old) =>
+        old
+          ? old.map((item) =>
+              item.id === statusId ? { ...item, viewedByMe: true } : item,
+            )
+          : old,
+      );
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.statuses });
     },
