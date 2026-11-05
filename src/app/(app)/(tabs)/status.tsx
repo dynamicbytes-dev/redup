@@ -19,6 +19,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Icon } from '@/components/ui/icon';
+import { ReportModal } from '@/components/ui/report-modal';
 import { Screen } from '@/components/ui/screen';
 import { useSession } from '@/features/auth/session';
 import { useContactsMap } from '@/features/chats/hooks';
@@ -852,6 +853,12 @@ function StatusViewerModal({
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [viewersOpen, setViewersOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    contentType: 'status';
+    contentId: string;
+    reportedUserId: string;
+    displayName: string;
+  } | null>(null);
 
   const viewedIdsRef = useRef<Set<string>>(new Set());
   const onViewedRef = useRef(onViewed);
@@ -1018,7 +1025,22 @@ function StatusViewerModal({
               <Pressable onPress={confirmDelete} hitSlop={10} style={{ padding: 6 }}>
                 <Icon name="trash-outline" size={22} color="#FFFFFF" />
               </Pressable>
-            ) : null}
+            ) : (
+              <Pressable
+                onPress={() => {
+                  setPaused(true);
+                  setReportTarget({
+                    contentType: 'status',
+                    contentId: current.id,
+                    reportedUserId: current.user_id,
+                    displayName: group.displayName,
+                  });
+                }}
+                hitSlop={10}
+                style={{ padding: 6 }}>
+                <Icon name="flag-outline" size={20} color="#FFFFFF" />
+              </Pressable>
+            )}
 
             <Pressable onPress={onClose} hitSlop={10} style={{ padding: 6 }}>
               <Icon name="close" size={26} color="#FFFFFF" />
@@ -1202,6 +1224,15 @@ function StatusViewerModal({
             </Pressable>
           </Pressable>
         </Modal>
+
+        <ReportModal
+          visible={Boolean(reportTarget)}
+          onClose={() => {
+            setReportTarget(null);
+            setPaused(false);
+          }}
+          target={reportTarget}
+        />
       </View>
     </Modal>
   );

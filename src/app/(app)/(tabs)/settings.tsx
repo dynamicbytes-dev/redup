@@ -7,7 +7,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Icon } from '@/components/ui/icon';
 import { ListItem } from '@/components/ui/list-item';
 import { Screen } from '@/components/ui/screen';
-import { signOut } from '@/features/auth/api';
+import { deleteAccount, signOut } from '@/features/auth/api';
 import { useSession } from '@/features/auth/session';
 import { useConversations } from '@/features/chats/hooks';
 import { usePushSettings } from '@/features/notifications/use-notifications';
@@ -30,6 +30,41 @@ export default function SettingsScreen() {
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Salir', style: 'destructive', onPress: () => signOut() },
     ]);
+  }
+
+  function confirmDeleteAccount() {
+    Alert.alert(
+      '¿Eliminar tu cuenta definitivamente?',
+      'Esta acción es IRREVERSIBLE. Se borrarán de inmediato todos tus mensajes, contactos, fotos y perfil de acuerdo con la política de privacidad.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, continuar',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Confirmación requerida',
+              '¿Confirmas la eliminación permanente de tu cuenta y todos sus datos asociados?',
+              [
+                { text: 'Volver', style: 'cancel' },
+                {
+                  text: 'Eliminar mi cuenta ahora',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await deleteAccount();
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'Error al eliminar cuenta.';
+                      Alert.alert('Error', msg);
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
   }
 
   async function handleTestNotification() {
@@ -191,6 +226,51 @@ export default function SettingsScreen() {
               title="Tu identificador"
               subtitle={`@${profile?.username ?? ''}`}
               value={userId ? `${userId.slice(0, 8)}…` : ''}
+            />
+            <ListItem
+              icon="trash-outline"
+              title="Eliminar mi cuenta"
+              subtitle="Borrar definitivamente tus datos personales"
+              destructive
+              onPress={confirmDeleteAccount}
+              last
+            />
+          </View>
+        </Section>
+
+        <Section title="Legal y Comunidad">
+          <View
+            style={{
+              marginHorizontal: 16,
+              borderRadius: 18,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+              overflow: 'hidden',
+            }}>
+            <ListItem
+              icon="document-text-outline"
+              title="Términos y Privacidad"
+              subtitle="Política de privacidad y condiciones de uso"
+              onPress={() => router.push('/legal')}
+            />
+            <ListItem
+              icon="shield-checkmark-outline"
+              title="Normas de la Comunidad (UGC)"
+              subtitle="Tolerancia cero a contenido abusivo y moderación"
+              onPress={() => router.push('/legal')}
+            />
+            <ListItem
+              icon="mail-outline"
+              title="Soporte y contacto"
+              subtitle="soporte@redup.app"
+              onPress={() => {
+                Alert.alert(
+                  'Contacto de Soporte',
+                  'Para asistencia técnica, consultas de privacidad o reportes urgentes de moderación, escríbenos a soporte@redup.app',
+                  [{ text: 'Entendido' }],
+                );
+              }}
               last
             />
           </View>

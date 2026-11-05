@@ -106,7 +106,70 @@ Gmail con contraseñas de aplicación no es apto para producción (límite de 10
 
 ---
 
-## 5. Actualizaciones OTA y Monitoreo
+## 5. Endurecimiento de Autenticación en Supabase Dashboard
+
+En el Dashboard de Producción de Supabase (`Authentication` -> `Providers` / `Security`):
+1. **Verificación de Email Obligatoria**:
+   - Activar `Confirm email` (`enable_confirmations = true`).
+2. **Seguridad y Longitud de Contraseñas**:
+   - `Minimum password length`: Establecer en **8 caracteres**.
+   - Activar requisitos de mayúsculas, minúsculas y números (`lower_upper_letters_digits`).
+3. **Prevención de Ataques y Email Bombing**:
+   - `Rate Limits`: Establecer `Max Frequency` para reseteos y confirmaciones en **60 segundos** (`max_frequency = "60s"`).
+   - Activar `Secure password change` (requiere reautenticación para cambios de contraseña).
+4. **Protección Anti-Bot (Captcha / Cloudflare Turnstile)**:
+   - En `Authentication` -> `Bot Detection`: Activar **Cloudflare Turnstile** con tu Site Key y Secret Key para blindar los endpoints de registro e inicio de sesión contra ataques de fuerza bruta y credential stuffing.
+
+---
+
+## 6. Deep Links Verificados (Universal Links / App Links)
+
+Para evitar que otras apps instaladas secuestren enlaces y sesiones mediante el esquema personalizado `redup://`, se configuraron Universal Links (iOS) y App Links (Android) con el dominio `https://redup.app`:
+
+### Archivos de verificación requeridos en el servidor web de `redup.app`:
+1. **iOS (`https://redup.app/.well-known/apple-app-site-association`)**:
+   ```json
+   {
+     "applinks": {
+       "apps": [],
+       "details": [
+         {
+           "appID": "<APPLE_TEAM_ID>.app.redup.mobile",
+           "paths": ["*"]
+         }
+       ]
+     }
+   }
+   ```
+2. **Android (`https://redup.app/.well-known/assetlinks.json`)**:
+   ```json
+   [
+     {
+       "relation": ["delegate_permission/common.handle_all_urls"],
+       "target": {
+         "namespace": "android_app",
+         "package_name": "app.redup.mobile",
+         "sha256_cert_fingerprints": ["<TU_SHA256_CERTIFICATE_FINGERPRINT>"]
+       }
+     }
+   ]
+   ```
+
+---
+
+## 7. Requisitos de Publicación en App Store y Google Play
+
+1. **Eliminación de Cuenta (App Store Guideline 5.1.1(v))**:
+   - La app incluye en Ajustes el botón destructivo **"Eliminar mi cuenta"**, que ejecuta `public.delete_my_account()` borrando en cascada los datos del usuario en la base de datos y sus archivos en Storage.
+2. **Moderación de Contenido Generado por Usuarios (Apple Guideline 1.2)**:
+   - Política de Tolerancia Cero implementada en [`src/app/(app)/legal.tsx`](file:///Users/rosangeles/Documents/redup/src/app/(app)/legal.tsx).
+   - Bloqueo inmediato de usuarios.
+   - Mecanismo integrado de reporte de contenido abusivo ([`ReportModal`](file:///Users/rosangeles/Documents/redup/src/components/ui/report-modal.tsx)) conectado a la tabla `public.reports`.
+   - Canal de contacto y atención de moderación en `soporte@redup.app`.
+
+---
+
+## 8. Actualizaciones OTA y Monitoreo
 
 1. **EAS Update (Over-The-Air Updates)**:
    - Permite publicar parches críticos de JS/assets al instante sin pasar por revisión de las tiendas:

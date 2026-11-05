@@ -195,3 +195,17 @@ export async function signOut(): Promise<void> {
   await unregisterPushNotificationsAsync();
   await supabase.auth.signOut();
 }
+
+/**
+ * Elimina definitivamente la cuenta del usuario en cumplimiento de las directrices
+ * de App Store (Guideline 5.1.1(v)) y normativas de privacidad (GDPR / CCPA).
+ * Borra permanentemente los datos personales, mensajes, contactos, estados y archivos en Storage.
+ */
+export async function deleteAccount(): Promise<void> {
+  await unregisterPushNotificationsAsync().catch(() => {});
+  const { error } = await supabase.rpc('delete_my_account');
+  if (error) {
+    throw new AppError('No pudimos eliminar la cuenta. Por favor, inténtalo de nuevo.');
+  }
+  await supabase.auth.signOut().catch(() => {});
+}
