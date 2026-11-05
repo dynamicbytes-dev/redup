@@ -10,9 +10,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { FullScreenLoader } from '@/components/ui/action-sheet';
 import { SessionProvider, useSession } from '@/features/auth/session';
+import { initErrorReporting } from '@/lib/error-reporting';
 import { queryClient } from '@/lib/query-client';
 import { ThemeProvider, useTheme } from '@/theme';
 
+initErrorReporting();
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {

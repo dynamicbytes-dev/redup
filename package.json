@@ -6,6 +6,7 @@
     "@expo/ui": "~58.0.27",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@sentry/react-native": "~8.28.0",
     "@supabase/supabase-js": "^2.118.0",
     "@tanstack/react-query": "^5.105.3",
     "date-fns": "^4.4.0",
@@ -31,6 +32,7 @@
     "expo-status-bar": "~58.0.4",
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.7",
+    "expo-updates": "~58.0.21",
     "expo-web-browser": "~58.0.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -64,6 +66,7 @@
     "db:status": "supabase status",
     "db:link": "supabase link",
     "db:push": "supabase db push",
+    "test:db": "docker exec -i supabase_db_redup psql -U postgres -d postgres < supabase/tests/security_and_rls_test.sql",
     "functions:deploy": "supabase functions deploy push-notify && supabase functions deploy livekit-token && supabase functions deploy auth-login"
   },
   "private": true

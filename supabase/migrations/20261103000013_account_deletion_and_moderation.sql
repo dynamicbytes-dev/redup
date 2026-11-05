@@ -20,6 +20,9 @@ begin
     raise exception 'not_authenticated';
   end if;
 
+  -- Habilitar borrado autorizado en storage.objects
+  perform set_config('storage.allow_delete_query', 'true', true);
+
   -- 1. Limpiar fotos y archivos multimedia de Storage creados por el usuario
   delete from storage.objects
   where bucket_id in ('avatars', 'statuses')

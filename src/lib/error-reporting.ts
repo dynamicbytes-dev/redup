@@ -1,8 +1,26 @@
+import * as Sentry from '@sentry/react-native';
+
 /**
- * Módulo de Observabilidad y Monitoreo de Errores para Producción.
- * Diseñado para integrarse transparentemente con Sentry (@sentry/react-native)
- * o Firebase Crashlytics.
+ * Módulo de Observabilidad y Monitoreo de Errores para Producción con Sentry.
  */
+
+const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+
+let isSentryInitialized = false;
+
+export function initErrorReporting(): void {
+  if (isSentryInitialized) return;
+
+  if (sentryDsn) {
+    Sentry.init({
+      dsn: sentryDsn,
+      enableAutoSessionTracking: true,
+      tracesSampleRate: __DEV__ ? 1.0 : 0.2,
+      debug: false,
+    });
+    isSentryInitialized = true;
+  }
+}
 
 export interface ErrorReportContext {
   userId?: string;
@@ -19,8 +37,11 @@ export function reportError(error: unknown, context?: ErrorReportContext): void 
     return;
   }
 
-  // En producción, si Sentry u otro servicio está configurado:
-  // Sentry.captureException(error, { extra: context });
+  if (isSentryInitialized) {
+    Sentry.captureException(error, {
+      extra: context as Record<string, unknown>,
+    });
+  }
 }
 
 export function reportWarning(message: string, metadata?: Record<string, unknown>): void {
@@ -29,6 +50,10 @@ export function reportWarning(message: string, metadata?: Record<string, unknown
     return;
   }
 
-  // En producción:
-  // Sentry.captureMessage(message, { level: 'warning', extra: metadata });
+  if (isSentryInitialized) {
+    Sentry.captureMessage(message, {
+      level: 'warning',
+      extra: metadata,
+    });
+  }
 }

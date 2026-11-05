@@ -153,7 +153,23 @@ Deno.serve(async (req: Request) => {
     }
 
     // =========================================================================
-    // 5. DESTINATARIOS REALES (SILENCIOS Y BLOQUEOS)
+    // 5. LOCK ATÓMICO DE IDEMPOTENCIA EN POSTGRES
+    // =========================================================================
+    // Evita notificaciones duplicadas ante reintentos o llamadas concurrentes
+    const { data: lockAcquired } = await admin.rpc('acquire_push_dispatch_lock', {
+      p_message_id: messageId,
+    });
+
+    if (lockAcquired === false) {
+      return securityResponse({
+        ok: true,
+        status: 'already_processed',
+        message: 'Notification for this message has already been dispatched',
+      });
+    }
+
+    // =========================================================================
+    // 6. DESTINATARIOS REALES (SILENCIOS Y BLOQUEOS)
     // =========================================================================
     const [{ data: senderProfile }, { data: conv }, { data: members }, { data: blocks }] =
       await Promise.all([
@@ -239,6 +255,13 @@ Deno.serve(async (req: Request) => {
     });
 
     const result = await pushResponse.json();
+
+    // Registrar cantidad de destinatarios alcanzados para auditoría
+    await admin.rpc('record_push_dispatch_count', {
+      p_message_id: messageId,
+      p_count: messages.length,
+    }).catch(() => {});
+
     return securityResponse({ sent: messages.length, result });
   } catch (err) {
     return securityResponse({ error: String(err) }, { status: 500 });
