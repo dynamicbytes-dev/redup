@@ -135,12 +135,15 @@ export function useIncomingCalls(userId: string | null) {
   useEffect(() => {
     if (!userId) return;
 
+    // Canal privado exclusivo del usuario (autorizado por RLS en realtime.messages)
+    // NUNCA usar canal público global para evitar intercepción de llamadas
     const channel = supabase
-      .channel('redup:calls')
+      .channel(`user:${userId}:calls`, {
+        config: { private: true },
+      })
       .on('broadcast', { event: 'incoming_call' }, ({ payload }) => {
         const call = (payload as { call?: CallLogItem })?.call;
         if (!call || call.caller_id === userId) return;
-        if (call.callee_id && call.callee_id !== userId) return;
         setIncomingCall(call);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       })

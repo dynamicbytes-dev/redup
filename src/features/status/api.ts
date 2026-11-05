@@ -58,8 +58,42 @@ function isMissingTableError(error: { code?: string; message?: string } | null):
   );
 }
 
+// Cache local en memoria para Signed URLs de estados privados
+const statusSignedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+export async function getStatusMediaUrl(mediaPath: string | null): Promise<string | null> {
+  if (!mediaPath) return null;
+
+  const now = Date.now();
+  const cached = statusSignedUrlCache.get(mediaPath);
+  if (cached && cached.expiresAt > now + 60_000) {
+    return cached.url;
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from('statuses')
+      .createSignedUrl(mediaPath, 3600); // 1 hora de vigencia
+
+    if (error || !data?.signedUrl) {
+      return null;
+    }
+
+    statusSignedUrlCache.set(mediaPath, {
+      url: data.signedUrl,
+      expiresAt: now + 3500 * 1000,
+    });
+    return data.signedUrl;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchActiveStatuses(currentUserId: string): Promise<StatusItem[]> {
   const nowIso = new Date().toISOString();
+
+  // Oportunísticamente purga estados expirados en el servidor
+  void supabase.rpc('purge_expired_statuses').then(() => {}, () => {});
 
   const { data, error } = await supabase
     .from('statuses')
@@ -176,7 +210,7 @@ export async function createImageStatus(input: {
   const path = `${input.userId}/status-${id}.jpg`;
 
   const { error: uploadError } = await supabase.storage
-    .from('avatars')
+    .from('statuses')
     .upload(path, buffer, { contentType: 'image/jpeg', upsert: true });
 
   if (uploadError) {
@@ -258,7 +292,7 @@ export async function deleteStatus(
   mediaPath?: string | null,
 ): Promise<void> {
   if (mediaPath) {
-    await supabase.storage.from('avatars').remove([mediaPath]).catch(() => {});
+    await supabase.storage.from('statuses').remove([mediaPath]).catch(() => {});
   }
 
   const { error } = await supabase.from('statuses').delete().eq('id', statusId);

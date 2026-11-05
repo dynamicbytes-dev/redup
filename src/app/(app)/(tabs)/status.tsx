@@ -24,6 +24,7 @@ import { useSession } from '@/features/auth/session';
 import { useContactsMap } from '@/features/chats/hooks';
 import { pickChatImageFromCamera, pickChatImageFromLibrary } from '@/features/chats/media';
 import { useFriendRequests } from '@/features/friends/hooks';
+import { getStatusMediaUrl } from '@/features/status/api';
 import {
   useCreateImageStatus,
   useCreateTextStatus,
@@ -33,7 +34,6 @@ import {
   useStatusesRealtime,
 } from '@/features/status/hooks';
 import { formatListTime, formatMessageTime } from '@/lib/format';
-import { avatarUrl } from '@/lib/storage';
 import type { StatusAuthorGroup, StatusItem } from '@/lib/types';
 import { useKeyboardHeight } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
@@ -902,6 +902,20 @@ function StatusViewerModal({
     return () => clearTimeout(timeout);
   }, [progress, group, currentId, safeIndex, items.length]);
 
+  const [imageUri, setImageUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (current?.kind === 'image' && current.media_path) {
+      getStatusMediaUrl(current.media_path).then((url) => {
+        if (active) setImageUri(url);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [current?.id, current?.kind, current?.media_path]);
+
   if (!group || !current) return null;
 
   function goPrev() {
@@ -939,7 +953,6 @@ function StatusViewerModal({
     ]);
   }
 
-  const imageUri = current.kind === 'image' ? avatarUrl(current.media_path) : null;
   const externalViewers = current.viewers.filter((v) => v.viewer_id !== currentUserId);
 
   return (

@@ -209,7 +209,7 @@ export async function startCallSession(input: {
 }): Promise<CallLogItem> {
   const id = Crypto.randomUUID();
   const nowIso = new Date().toISOString();
-  const roomName = `redup-${input.conversationId.slice(0, 8)}-${Date.now().toString(36)}`;
+  const roomName = `redup-${input.conversationId}-${id}`;
 
   const fallbackItem: CallLogItem = {
     id,
@@ -271,8 +271,16 @@ export async function startCallSession(input: {
   const created =
     !error && data ? normalizeCallRow(data as unknown as RawCallRow) : fallbackItem;
 
-  // Emitir señalización de llamada entrante por Realtime
-  const signalChannel = supabase.channel('redup:calls');
+  // Emitir señalización de llamada entrante dirigida y autenticada (canal privado por destinatario o grupo)
+  // NUNCA usar canales públicos globales (anti-interceptación de llamadas)
+  const targetTopic = input.calleeId
+    ? `user:${input.calleeId}:calls`
+    : `conv:${input.conversationId}`;
+
+  const signalChannel = supabase.channel(targetTopic, {
+    config: { private: true },
+  });
+
   signalChannel.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
       signalChannel

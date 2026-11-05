@@ -28,8 +28,15 @@ export function useChatRealtime(
   const [onlineIds, setOnlineIds] = useState<string[]>([]);
 
   useEffect(() => {
+    if (!conversationId || !userId) return;
+
+    // Canal privado autorizado: solo miembros de la conversación pueden suscribirse
+    // Protegido por RLS en realtime.messages (anti-espionaje de typing y presencia)
     const channel = supabase.channel(`conv:${conversationId}`, {
-      config: { presence: { key: userId } },
+      config: {
+        private: true,
+        presence: { key: userId },
+      },
     });
 
     channel

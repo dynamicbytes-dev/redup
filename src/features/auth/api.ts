@@ -53,19 +53,30 @@ export async function signInWithIdentifier(identifier: string, password: string)
     'Demasiados intentos de inicio de sesión.',
   );
 
-  let email = value;
-
-  if (!value.includes('@')) {
-    const { data, error } = await supabase.rpc('resolve_login_email', {
-      uname: normalizeUsername(value),
-    });
-    if (error) throw new AppError('No pudimos iniciar sesión. Inténtalo de nuevo.');
-    if (!data) throw new AppError('Usuario o contraseña incorrectos.');
-    email = data as string;
+  if (value.includes('@')) {
+    const { error } = await supabase.auth.signInWithPassword({ email: value, password });
+    if (error) throw new AppError('Usuario o contraseña incorrectos.');
+    return;
   }
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw new AppError('Usuario o contraseña incorrectos.');
+  // Si inicia con username, autenticamos a través de la Edge Function en el servidor.
+  // Esto elimina completamente la exposición y enumeración de correos electrónicos.
+  const { data, error } = await supabase.functions.invoke('auth-login', {
+    body: { identifier: value, password },
+  });
+
+  if (error || !data?.session) {
+    throw new AppError('Usuario o contraseña incorrectos.');
+  }
+
+  const { error: sessionError } = await supabase.auth.setSession({
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+  });
+
+  if (sessionError) {
+    throw new AppError('No pudimos iniciar tu sesión de forma segura.');
+  }
 }
 
 export async function signUp(input: {

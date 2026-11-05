@@ -243,54 +243,14 @@ export async function dispatchConversationPushNotification(input: {
   messageId: string;
 }): Promise<void> {
   try {
-    const { data, error } = await supabase.rpc('get_conversation_push_targets', {
-      conv: input.conversationId,
-    });
-    if (error || !data) return;
-
-    const rows = data as { user_id: string; token: string; platform: string }[];
-    const remoteTokens = rows
-      .map((r) => r.token)
-      .filter(
-        (token) =>
-          token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken['),
-      );
-
-    if (remoteTokens.length === 0) return;
-
-    const preview = formatPushPreview(input.kind, input.body);
-    const title =
-      input.isGroup && input.conversationTitle
-        ? input.conversationTitle
-        : input.senderName;
-    const messageBody =
-      input.isGroup && input.conversationTitle
-        ? `${input.senderName}: ${preview}`
-        : preview;
-
-    const messages = remoteTokens.map((to) => ({
-      to,
-      sound: 'default',
-      title,
-      body: messageBody,
-      data: {
-        conversationId: input.conversationId,
-        messageId: input.messageId,
-        url: `/chat/${input.conversationId}`,
-      },
-    }));
-
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messages),
+    // Despacho seguro de notificación a través de la Edge Function server-side.
+    // Los push tokens de los destinatarios nunca se exponen al cliente móvil,
+    // y el servidor valida contra la base de datos la autenticidad del mensaje y bloqueos.
+    await supabase.functions.invoke('push-notify', {
+      body: { messageId: input.messageId },
     });
   } catch {
-    // Silencioso en caso de fallo de red o tabla aún no migrada
+    // Silencioso en caso de desconexión o contingencia de red
   }
 }
 

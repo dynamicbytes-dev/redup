@@ -78,7 +78,10 @@ export default function ActiveCallScreen() {
     if (!callId || !call) return;
 
     const channel = supabase.channel(`redup:call:${callId}`, {
-      config: { presence: { key: userId ?? 'guest' } },
+      config: {
+        private: true,
+        presence: { key: userId ?? 'guest' },
+      },
     });
 
     channel
@@ -138,7 +141,9 @@ export default function ActiveCallScreen() {
 
   function broadcastState(nextMuted: boolean, nextVideo: boolean) {
     if (!callId) return;
-    const channel = supabase.channel(`redup:call:${callId}`);
+    const channel = supabase.channel(`redup:call:${callId}`, {
+      config: { private: true },
+    });
     channel.send({
       type: 'broadcast',
       event: 'call:state',
@@ -180,7 +185,9 @@ export default function ActiveCallScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
 
     if (call && userId) {
-      const channel = supabase.channel(`redup:call:${call.id}`);
+      const channel = supabase.channel(`redup:call:${call.id}`, {
+        config: { private: true },
+      });
       channel
         .send({
           type: 'broadcast',

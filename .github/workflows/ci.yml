@@ -1,0 +1,39 @@
+name: CI - Integración Continua Redup
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Verificación de Código y Dependencias
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Diagnóstico Expo Doctor
+        run: npx expo-doctor
+
+      - name: Análisis Estático (Linting)
+        run: npx expo lint
+
+      - name: Verificación de Tipos TypeScript
+        run: npx tsc --noEmit
+

@@ -43,7 +43,6 @@ const resilientFetch: typeof fetch = async (input, init) => {
         '127.0.0.1',
         currentHost,
         metroHost && metroHost !== 'localhost' ? metroHost : null,
-        '192.168.1.11',
         Platform.OS === 'android' ? '10.0.2.2' : null,
       ].filter((h): h is string => Boolean(h)),
     ),

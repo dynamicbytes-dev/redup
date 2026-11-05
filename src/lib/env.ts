@@ -14,7 +14,7 @@ export function getActiveLocalHostOverride(): string | null {
 }
 
 /**
- * Obtiene el host que sirve el bundle de Metro (p. ej. `localhost`, `127.0.0.1` o `192.168.1.11`).
+ * Obtiene el host que sirve el bundle de Metro (p. ej. `localhost` o `127.0.0.1`).
  */
 export function bundlerHost(): string | null {
   const hostUri =
@@ -27,7 +27,16 @@ export function bundlerHost(): string | null {
 }
 
 export function getSupabaseUrl(): string {
-  const explicit = process.env.EXPO_PUBLIC_SUPABASE_URL ?? FALLBACK_URL;
+  const explicit = process.env.EXPO_PUBLIC_SUPABASE_URL;
+
+  if (!explicit) {
+    if (!__DEV__) {
+      throw new Error(
+        '[Redup Error] EXPO_PUBLIC_SUPABASE_URL no está configurada. En producción se requiere una URL válida de Supabase.',
+      );
+    }
+    return FALLBACK_URL;
+  }
 
   // Solo reescribimos hosts de desarrollo local (puerto 54321 o IPs privadas)
   const isLocalDev = /:54321\b/.test(explicit);
@@ -69,4 +78,12 @@ export function normalizeLocalSupabaseUrl(url: string): string {
   return url.replace(/\/\/([^:/]+):54321/, `//${targetHost}:54321`);
 }
 
-export const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+export const supabaseAnonKey = (() => {
+  const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key && !__DEV__) {
+    throw new Error(
+      '[Redup Error] EXPO_PUBLIC_SUPABASE_ANON_KEY no está configurada. En producción se requiere una anon key válida.',
+    );
+  }
+  return key ?? '';
+})();

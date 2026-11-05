@@ -110,7 +110,12 @@ export async function insertMessage(input: {
   return normalizeMessage(data as MessageRow);
 }
 
-export async function softDeleteMessage(id: string): Promise<void> {
+export async function softDeleteMessage(id: string, mediaPath?: string | null): Promise<void> {
+  // Defensa en profundidad: eliminar físicamente el objeto de Storage
+  if (mediaPath) {
+    await supabase.storage.from('media').remove([mediaPath]).catch(() => {});
+  }
+
   const { error } = await supabase
     .from('messages')
     .update({ body: null, media_path: null, deleted_at: new Date().toISOString() })
