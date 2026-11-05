@@ -367,23 +367,13 @@ export async function finishCallSession(input: {
     );
 
   if (input.insertChatSummary) {
-    const icon = input.kind === 'video' ? '📹' : '📞';
-    const label = input.kind === 'video' ? 'Videollamada' : 'Llamada de voz';
-    const summary =
-      input.status === 'completed' && duration > 0
-        ? `${icon} ${label} · ${formatCallDuration(duration)}`
-        : input.status === 'declined'
-          ? `${icon} ${label} rechazada`
-          : `${icon} ${label} sin respuesta`;
-
     await supabase
-      .from('messages')
-      .insert({
-        id: Crypto.randomUUID(),
-        conversation_id: input.conversationId,
-        sender_id: input.actorId,
-        kind: 'system',
-        body: summary,
+      .rpc('post_system_event', {
+        p_conversation_id: input.conversationId,
+        p_event: 'call_summary',
+        p_call_kind: input.kind,
+        p_call_status: input.status,
+        p_duration_sec: duration,
       })
       .then(
         () => {},

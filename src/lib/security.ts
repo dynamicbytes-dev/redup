@@ -149,8 +149,8 @@ export function validatePasswordStrict(value: string, isSignup = true): string |
     if (COMMON_WEAK_PASSWORDS.has(value.toLowerCase())) {
       return 'Esa contraseña es muy común e insegura. Elige una más fuerte.';
     }
-    if (!/[a-zA-Z]/.test(value) || !/[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)) {
-      return 'Incluye al menos una letra y un número o símbolo.';
+    if (!/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/[0-9]/.test(value)) {
+      return 'Incluye al menos una minúscula, una mayúscula y un número.';
     }
   }
   return null;

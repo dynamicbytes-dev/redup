@@ -131,9 +131,12 @@ export default function ChatScreen() {
     return output.reverse();
   }, [chronological]);
 
-  const minOtherRead = otherMembers.length
-    ? Math.min(...otherMembers.map((member) => new Date(member.last_read_at).getTime()))
-    : 0;
+  const readTimes = otherMembers
+    .map((member) =>
+      member.last_read_at ? new Date(member.last_read_at).getTime() : Number.NaN,
+    )
+    .filter((time) => Number.isFinite(time));
+  const minOtherRead = readTimes.length ? Math.min(...readTimes) : 0;
 
   // Marcar como leído al abrir y cuando entra un mensaje nuevo
   useEffect(() => {

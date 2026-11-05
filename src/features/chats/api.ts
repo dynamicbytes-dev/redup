@@ -371,12 +371,9 @@ export async function createGroupConversation(input: {
   const { error: membersError } = await supabase.from('conversation_members').insert(otherRows);
   if (membersError) throw new ChatError('No pudimos añadir a los participantes del grupo.');
 
-  await supabase.from('messages').insert({
-    id: Crypto.randomUUID(),
-    conversation_id: conversationId,
-    sender_id: input.creatorId,
-    kind: 'system',
-    body: `Creó el grupo “${cleanName}”`,
+  await supabase.rpc('post_system_event', {
+    p_conversation_id: conversationId,
+    p_event: 'group_created',
   });
 
   return conversationId;
@@ -405,12 +402,9 @@ export async function updateGroupDetails(input: {
   if (error) throw new ChatError('No pudimos guardar los cambios del grupo.');
 
   if (input.systemText) {
-    await supabase.from('messages').insert({
-      id: Crypto.randomUUID(),
-      conversation_id: input.conversationId,
-      sender_id: input.actorId,
-      kind: 'system',
-      body: input.systemText,
+    await supabase.rpc('post_system_event', {
+      p_conversation_id: input.conversationId,
+      p_event: 'group_updated',
     });
   }
 }
@@ -432,12 +426,10 @@ export async function addGroupMembers(input: {
   if (error) throw new ChatError('No pudimos añadir a los nuevos participantes.');
 
   const names = input.users.map((u) => u.displayName).join(', ');
-  await supabase.from('messages').insert({
-    id: Crypto.randomUUID(),
-    conversation_id: input.conversationId,
-    sender_id: input.actorId,
-    kind: 'system',
-    body: `Añadió a ${names}`,
+  await supabase.rpc('post_system_event', {
+    p_conversation_id: input.conversationId,
+    p_event: 'members_added',
+    p_target_name: names,
   });
 }
 
@@ -456,15 +448,10 @@ export async function updateGroupMemberRole(input: {
 
   if (error) throw new ChatError('No pudimos cambiar el rol del participante.');
 
-  await supabase.from('messages').insert({
-    id: Crypto.randomUUID(),
-    conversation_id: input.conversationId,
-    sender_id: input.actorId,
-    kind: 'system',
-    body:
-      input.role === 'admin'
-        ? `Nombró administrador a ${input.targetName}`
-        : `Quitó como administrador a ${input.targetName}`,
+  await supabase.rpc('post_system_event', {
+    p_conversation_id: input.conversationId,
+    p_event: input.role === 'admin' ? 'role_admin' : 'role_member',
+    p_target_name: input.targetName,
   });
 }
 
@@ -474,14 +461,6 @@ export async function removeGroupMember(input: {
   targetUserId: string;
   targetName: string;
 }): Promise<void> {
-  await supabase.from('messages').insert({
-    id: Crypto.randomUUID(),
-    conversation_id: input.conversationId,
-    sender_id: input.actorId,
-    kind: 'system',
-    body: `Eliminó a ${input.targetName} del grupo`,
-  });
-
   const { error } = await supabase
     .from('conversation_members')
     .delete()
@@ -489,6 +468,12 @@ export async function removeGroupMember(input: {
     .eq('user_id', input.targetUserId);
 
   if (error) throw new ChatError('No pudimos eliminar al participante del grupo.');
+
+  await supabase.rpc('post_system_event', {
+    p_conversation_id: input.conversationId,
+    p_event: 'member_removed',
+    p_target_name: input.targetName,
+  });
 }
 
 export async function leaveGroupConversation(input: {
@@ -513,12 +498,9 @@ export async function leaveGroupConversation(input: {
     }
   }
 
-  await supabase.from('messages').insert({
-    id: Crypto.randomUUID(),
-    conversation_id: input.conversationId,
-    sender_id: input.userId,
-    kind: 'system',
-    body: `${input.displayName} salió del grupo`,
+  await supabase.rpc('post_system_event', {
+    p_conversation_id: input.conversationId,
+    p_event: 'member_left',
   });
 
   const { error } = await supabase

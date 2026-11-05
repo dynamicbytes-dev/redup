@@ -13,6 +13,7 @@ import { useSession } from '@/features/auth/session';
 import { setBlockedUser } from '@/features/chats/api';
 import { useBlockedUsers, useContactsMap } from '@/features/chats/hooks';
 import { queryKeys } from '@/lib/query-client';
+import type { PrivacySettings } from '@/lib/types';
 import { useTheme } from '@/theme';
 
 export default function PrivacyScreen() {
@@ -28,6 +29,15 @@ export default function PrivacyScreen() {
 
   const blockedUsers = blockedQuery.data ?? [];
   const contactsMap = contactsMapQuery.data ?? {};
+
+  async function handlePrivacyChange(patch: Partial<PrivacySettings>) {
+    setError(null);
+    try {
+      await updatePrivacy(patch);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No pudimos guardar tus ajustes.');
+    }
+  }
 
   async function handleUnblock(blockedId: string) {
     if (!userId) return;
@@ -114,7 +124,7 @@ export default function PrivacyScreen() {
                 value={privacy.showOnline}
                 onValueChange={(value) => {
                   Haptics.selectionAsync().catch(() => {});
-                  updatePrivacy({ showOnline: value });
+                  handlePrivacyChange({ showOnline: value });
                 }}
                 trackColor={{ false: colors.surfaceStrong, true: colors.primary }}
                 thumbColor="#FFFFFF"
@@ -150,7 +160,7 @@ export default function PrivacyScreen() {
                 value={privacy.readReceipts}
                 onValueChange={(value) => {
                   Haptics.selectionAsync().catch(() => {});
-                  updatePrivacy({ readReceipts: value });
+                  handlePrivacyChange({ readReceipts: value });
                 }}
                 trackColor={{ false: colors.surfaceStrong, true: colors.primary }}
                 thumbColor="#FFFFFF"
@@ -160,7 +170,7 @@ export default function PrivacyScreen() {
 
           <AppText variant="micro" color={colors.textFaint} style={{ paddingHorizontal: 4 }}>
             Si desactivas tu estado en línea o las confirmaciones de lectura, tampoco podrás ver los
-            de las demás personas en conversaciones individuales. En los grupos siempre se muestran.
+            de las demás personas. En los grupos se muestran solo si cada persona las comparte.
           </AppText>
         </View>
 

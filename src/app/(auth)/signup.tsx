@@ -49,6 +49,7 @@ export default function SignupScreen() {
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
 
   // Verificación automática en tiempo real de unicidad del @username
   useEffect(() => {
@@ -146,12 +147,15 @@ export default function SignupScreen() {
 
     setBusy(true);
     try {
-      await signUp({
+      const result = await signUp({
         email,
         password,
         username: normalizeUsername(username),
         displayName,
       });
+      if (result.needsConfirmation) {
+        setConfirmationEmail(email);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No pudimos crear la cuenta.');
       setChallenge(generateHumanChallenge());
@@ -162,6 +166,24 @@ export default function SignupScreen() {
   }
 
   const isChallengeSolved = challengeAnswer.trim() === challenge.expectedAnswer;
+
+  if (confirmationEmail) {
+    return (
+      <AuthShell
+        title="Confirma tu correo"
+        subtitle={`Enviamos un enlace de confirmación a ${confirmationEmail}.`}>
+        <AppText color={colors.textMuted}>
+          Abre el enlace del correo para activar tu cuenta. Si no lo encuentras, revisa la
+          carpeta de spam o correo no deseado.
+        </AppText>
+        <Button
+          title="Ir a iniciar sesión"
+          size="lg"
+          onPress={() => router.replace('/login')}
+        />
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell title="Crea tu cuenta" subtitle="Tres datos y ya estás dentro.">
@@ -230,7 +252,7 @@ export default function SignupScreen() {
       <TextField
         label="Contraseña"
         icon="lock-closed-outline"
-        placeholder="Mínimo 8 caracteres, letras y números"
+        placeholder="Mínimo 8 caracteres, mayúscula, minúscula y número"
         secureTextEntry
         value={password}
         onChangeText={setPassword}

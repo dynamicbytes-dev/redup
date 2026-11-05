@@ -4,7 +4,7 @@ export type Profile = {
   display_name: string;
   avatar_path: string | null;
   about: string | null;
-  last_seen_at: string;
+  last_seen_at: string | null;
   created_at: string;
   show_online?: boolean;
   read_receipts?: boolean;
@@ -43,7 +43,7 @@ export type ConversationOverview = {
   other_last_seen_at: string | null;
   muted_until: string | null;
   my_role: MemberRole | null;
-  last_read_at: string;
+  last_read_at: string | null;
 };
 
 export type MessageKind = 'text' | 'image' | 'audio' | 'file' | 'system';
@@ -74,7 +74,7 @@ export type ConversationMember = {
   user_id: string;
   role: MemberRole;
   joined_at: string;
-  last_read_at: string;
+  last_read_at: string | null;
   muted_until: string | null;
   profile: Pick<
     Profile,

@@ -84,7 +84,7 @@ export async function signUp(input: {
   password: string;
   username: string;
   displayName: string;
-}): Promise<void> {
+}): Promise<{ needsConfirmation: boolean }> {
   const email = sanitizeText(input.email, 254).toLowerCase();
   const username = normalizeUsername(input.username);
   const displayName = sanitizeText(input.displayName, 60);
@@ -128,8 +128,10 @@ export async function signUp(input: {
   }
 
   if (!data.session) {
-    throw new AppError('Revisa tu correo para confirmar la cuenta.');
+    return { needsConfirmation: true };
   }
+
+  return { needsConfirmation: false };
 }
 
 export async function requestPasswordReset(emailInput: string): Promise<string> {

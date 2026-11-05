@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import {
@@ -35,16 +34,12 @@ const DEFAULT_PRIVACY: PrivacySettings = {
   readReceipts: true,
 };
 
-function privacyStorageKey(userId: string) {
-  return `redup.privacy.${userId}`;
-}
-
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [privacy, setPrivacy] = useState<PrivacySettings>(DEFAULT_PRIVACY);
+  const [privacyOverride, setPrivacyOverride] = useState<Partial<PrivacySettings>>({});
   const [globalOnlineIds, setGlobalOnlineIds] = useState<string[]>([]);
   const [appState, setAppState] = useState<AppStateStatus>(
     () => (AppState.currentState as AppStateStatus | null) ?? 'active',
@@ -60,7 +55,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         router.replace('/reset-password');
       } else if (event === 'SIGNED_OUT') {
         queryClient.clear();
-        setPrivacy(DEFAULT_PRIVACY);
+        setPrivacyOverride({});
         setGlobalOnlineIds([]);
       }
     });
@@ -82,48 +77,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const userId = session?.user.id ?? null;
 
-  // Cargar ajustes de privacidad guardados
-  useEffect(() => {
-    if (!userId) return;
-    let cancelled = false;
-    AsyncStorage.getItem(privacyStorageKey(userId))
-      .then((raw) => {
-        if (cancelled || !raw) return;
-        try {
-          const parsed = JSON.parse(raw) as Partial<PrivacySettings>;
-          setPrivacy({
-            showOnline: parsed.showOnline ?? true,
-            readReceipts: parsed.readReceipts ?? true,
-          });
-        } catch {
-          // Ignorar JSON corrupto
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  const updatePrivacy = useCallback(
-    async (patch: Partial<PrivacySettings>) => {
-      setPrivacy((prev) => {
-        const next: PrivacySettings = { ...prev, ...patch };
-        if (userId) {
-          AsyncStorage.setItem(privacyStorageKey(userId), JSON.stringify(next)).catch(() => {});
-          supabase
-            .rpc('update_privacy_settings', {
-              p_show_online: next.showOnline,
-              p_read_receipts: next.readReceipts,
-            })
-            .then(() => {});
-        }
-        return next;
-      });
-    },
-    [userId],
-  );
-
   const profileQuery = useQuery({
     queryKey: queryKeys.profile(userId ?? 'anon'),
     queryFn: async () => {
@@ -138,12 +91,51 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     enabled: Boolean(userId),
   });
 
+  // La base de datos es la fuente de verdad; el override es solo optimista (mientras
+  // se refresca el perfil tras guardar) y se reinicia al cerrar sesión.
+  const serverPrivacy = useMemo<PrivacySettings>(
+    () => ({
+      showOnline: profileQuery.data?.show_online ?? DEFAULT_PRIVACY.showOnline,
+      readReceipts: profileQuery.data?.read_receipts ?? DEFAULT_PRIVACY.readReceipts,
+    }),
+    [profileQuery.data],
+  );
+
+  const privacy = useMemo<PrivacySettings>(
+    () => ({ ...serverPrivacy, ...privacyOverride }),
+    [serverPrivacy, privacyOverride],
+  );
+
+  const updatePrivacy = useCallback(
+    async (patch: Partial<PrivacySettings>) => {
+      if (!userId) return;
+      if (!profileQuery.isSuccess) {
+        throw new Error('Espera un momento mientras cargamos tus ajustes.');
+      }
+
+      const next: PrivacySettings = { ...privacy, ...patch };
+
+      const { error } = await supabase.rpc('update_privacy_settings', {
+        p_show_online: next.showOnline,
+        p_read_receipts: next.readReceipts,
+      });
+
+      if (error) {
+        throw new Error('No pudimos guardar tus ajustes de privacidad. Inténtalo de nuevo.');
+      }
+
+      setPrivacyOverride((prev) => ({ ...prev, ...patch }));
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) });
+    },
+    [privacy, profileQuery.isSuccess, userId],
+  );
+
   // Canal de presencia global en toda la app
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !profileQuery.isSuccess) return;
 
     const channel = supabase.channel('redup:presence', {
-      config: { presence: { key: userId } },
+      config: { private: true, presence: { key: userId } },
     });
 
     channel
@@ -179,11 +171,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setGlobalOnlineIds([]);
       supabase.removeChannel(channel);
     };
-  }, [userId, privacy.showOnline, appState]);
+  }, [userId, profileQuery.isSuccess, privacy.showOnline, appState]);
 
   // Latido de "última conexión" (solo cuando showOnline está activo y la app está activa)
   useEffect(() => {
-    if (!userId || !privacy.showOnline || appState !== 'active') return;
+    if (!userId || !profileQuery.isSuccess || !privacy.showOnline || appState !== 'active') return;
     const touch = () => {
       supabase.rpc('touch_last_seen').then(() => {});
       queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) });
@@ -194,7 +186,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [userId, privacy.showOnline, appState]);
+  }, [userId, profileQuery.isSuccess, privacy.showOnline, appState]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
