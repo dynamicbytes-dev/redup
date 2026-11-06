@@ -157,8 +157,11 @@ function PrivacyContent() {
       <SectionCard title="3. Tus Derechos y Eliminación de Cuenta">
         <AppText color={colors.textMuted} style={{ lineHeight: 22 }}>
           En cumplimiento con el RGPD, CCPA y los estándares de App Store (Guideline 5.1.1),
-          tienes derecho a solicitar el borrado íntegro e irreversible de tu cuenta y de todos tus
-          datos directamente desde la sección Ajustes &gt; Eliminar mi cuenta.
+          puedes eliminar tu cuenta desde Ajustes &gt; Eliminar mi cuenta. Se borrarán tu perfil,
+          avatar, estados, tokens y el contenido de los mensajes que hayas enviado. En las
+          conversaciones de otras personas esos mensajes aparecerán como eliminados. Podemos
+          conservar copias de seguridad cifradas durante el periodo de retención del proveedor
+          antes de su purga definitiva.
         </AppText>
       </SectionCard>
 

@@ -175,12 +175,24 @@ end $$;
 do $$
 declare
   v_victim uuid := gen_random_uuid();
+  v_conv_id uuid := gen_random_uuid();
+  v_msg_id uuid := gen_random_uuid();
   v_user_exists boolean;
+  v_msg_body text;
+  v_msg_media text;
+  v_msg_deleted timestamptz;
 begin
   perform set_config('role', 'postgres', true);
 
   -- Crear usuario sintético en auth.users y profile
   perform pg_temp.create_test_user(v_victim, 'victim@test.local', 'victim_user', 'Victim User');
+
+  -- Crear una conversación y un mensaje con archivo adjunto de la víctima
+  insert into public.conversations (id, type) values (v_conv_id, 'direct');
+  insert into public.conversation_members (conversation_id, user_id)
+  values (v_conv_id, v_victim);
+  insert into public.messages (id, conversation_id, sender_id, kind, body, media_path)
+  values (v_msg_id, v_conv_id, v_victim, 'image', 'Foto privada', 'media/test/foto.jpg');
 
   -- Simular sesión de la víctima
   perform set_config('request.jwt.claim.sub', v_victim::text, true);
@@ -189,10 +201,18 @@ begin
   -- Ejecutar eliminación de cuenta
   perform public.delete_my_account();
 
-  -- Verificar que fue eliminado de auth.users y profiles
+  -- Verificar que fue eliminado de auth.users y que su mensaje quedó sin contenido
   perform set_config('role', 'postgres', true);
   select exists (select 1 from auth.users where id = v_victim) into v_user_exists;
+  select body, media_path, deleted_at
+    into v_msg_body, v_msg_media, v_msg_deleted
+  from public.messages
+  where id = v_msg_id;
+
   perform pg_temp.assert(v_user_exists = false, 'delete_my_account: cuenta purgada completamente');
+  perform pg_temp.assert(v_msg_deleted is not null, 'delete_my_account: mensajes marcados como eliminados');
+  perform pg_temp.assert(v_msg_body is null, 'delete_my_account: cuerpo del mensaje borrado');
+  perform pg_temp.assert(v_msg_media is null, 'delete_my_account: referencia a archivo borrada');
 end $$;
 
 rollback; -- Revertir cambios de prueba para no ensuciar la base de datos

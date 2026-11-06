@@ -41,11 +41,29 @@ export async function isUsernameAvailable(username: string): Promise<boolean> {
   return Boolean(data);
 }
 
+function loginErrorMessage(error: unknown): string {
+  const status =
+    typeof error === 'object' && error !== null && 'context' in error
+      ? (error as { context?: { status?: number } }).context?.status
+      : undefined;
+
+  if (status === 429) {
+    return 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
+  }
+
+  if (status === 403) {
+    return 'No pudimos completar la verificación de seguridad. Inténtalo de nuevo.';
+  }
+
+  return 'Usuario o contraseña incorrectos.';
+}
+
 export async function signInWithIdentifier(identifier: string, password: string): Promise<void> {
   const value = sanitizeText(identifier, 254);
   if (!value || !password) throw new AppError('Escribe tu usuario y contraseña.');
 
-  // Rate limiting anti-fuerza bruta: máximo 5 intentos por minuto por identificador
+  // Rate limiting anti-fuerza bruta en el cliente (UX). El límite real se
+  // aplica en la Edge Function, que cubre tanto correo como @username.
   assertRateLimit(
     `login:${value.toLowerCase()}`,
     5,
@@ -53,20 +71,14 @@ export async function signInWithIdentifier(identifier: string, password: string)
     'Demasiados intentos de inicio de sesión.',
   );
 
-  if (value.includes('@')) {
-    const { error } = await supabase.auth.signInWithPassword({ email: value, password });
-    if (error) throw new AppError('Usuario o contraseña incorrectos.');
-    return;
-  }
-
-  // Si inicia con username, autenticamos a través de la Edge Function en el servidor.
-  // Esto elimina completamente la exposición y enumeración de correos electrónicos.
+  // Todos los inicios de sesión pasan por la Edge Function para aplicar
+  // rate limiting distribuido y, si está configurado, Turnstile.
   const { data, error } = await supabase.functions.invoke('auth-login', {
     body: { identifier: value, password },
   });
 
   if (error || !data?.session) {
-    throw new AppError('Usuario o contraseña incorrectos.');
+    throw new AppError(loginErrorMessage(error));
   }
 
   const { error: sessionError } = await supabase.auth.setSession({
@@ -114,6 +126,9 @@ export async function signUp(input: {
     password: input.password,
     options: {
       data: { username, display_name: displayName },
+      // Vuelve a la app después de confirmar el correo. En producción esta URL
+      // debe estar incluida en las Redirect URLs del proyecto de Supabase.
+      emailRedirectTo: Linking.createURL('/'),
     },
   });
 
@@ -199,9 +214,11 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Elimina definitivamente la cuenta del usuario en cumplimiento de las directrices
- * de App Store (Guideline 5.1.1(v)) y normativas de privacidad (GDPR / CCPA).
- * Borra permanentemente los datos personales, mensajes, contactos, estados y archivos en Storage.
+ * Elimina la cuenta del usuario en cumplimiento de App Store (5.1.1(v)) y GDPR/CCPA.
+ * Borra perfil, avatar, estados, tokens y el contenido de los mensajes enviados.
+ * En las conversaciones de otras personas esos mensajes quedan como "eliminado"
+ * para preservar la integridad de la conversación. El proveedor puede conservar
+ * copias de seguridad cifradas durante su periodo de retención.
  */
 export async function deleteAccount(): Promise<void> {
   await unregisterPushNotificationsAsync().catch(() => {});

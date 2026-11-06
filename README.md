@@ -35,8 +35,7 @@ npm install
 # 2. Configurar variables de entorno
 cp .env.example .env
 
-# 3. Levantar Supabase local y aplicar migraciones + datos de prueba
-npx supabase start
+# 3. Levantar Supabase local, aplicar migraciones y cargar datos de prueba
 npm run db:reset
 
 # 4. Iniciar el servidor de desarrollo de Expo
@@ -184,9 +183,10 @@ npm run ios          # Compila e instala la app nativa en iOS
 npm run web          # Inicia la versión web
 npm run typecheck    # Verifica tipos con TypeScript (tsc --noEmit)
 npm run lint         # Ejecuta el linter de Expo y React Compiler (expo lint)
-npm run db:start     # Levanta los contenedores locales de Supabase
+npm run db:start     # Levanta el stack local y aplica migraciones pendientes
 npm run db:stop      # Detiene los contenedores locales de Supabase
-npm run db:reset     # Recrea la base de datos local aplicando todas las migraciones y seed.sql
+npm run db:reset     # Recrea la base local desde cero con migraciones y seed.sql
+npm run db:seed      # Recarga solo los datos de prueba en la base local
 npm run db:status    # Muestra las URLs y claves del entorno local de Supabase
 ```
 

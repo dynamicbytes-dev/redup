@@ -20,11 +20,14 @@ El proyecto cuenta con [`eas.json`](file:///Users/rosangeles/Documents/redup/eas
    ```
    *(Esto asignará automáticamente el `projectId` y el `owner` en `app.json`).*
 
-3. Configurar los secretos de producción en EAS:
+3. Configurar las variables de producción en EAS (entornos `production` y `preview`):
    ```bash
-   eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value "https://tu-proyecto.supabase.co"
-   eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "tu_anon_key_de_produccion"
+   eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://tu-proyecto.supabase.co" --environment production --visibility plaintext
+   eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "tu_anon_key_de_produccion" --environment production --visibility sensitive
+   eas env:create --name EXPO_PUBLIC_SENTRY_DSN --value "https://...@sentry.io/..." --environment production --visibility plaintext
    ```
+   `eas secret:create` sigue funcionando pero está en modo legado; usa `eas env:create`.
+   Para source maps de Sentry, configura también `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` y `SENTRY_PROJECT`.
 
 4. Compilar el APK o bundle de producción:
    ```bash
@@ -52,21 +55,34 @@ El proyecto cuenta con [`eas.json`](file:///Users/rosangeles/Documents/redup/eas
    ```bash
    npm run db:link
    ```
-3. Aplicar todas las migraciones acumuladas (`000000_init.sql` a `000012_...sql`):
+3. Verificar qué migraciones se aplicarán y aplicar todas (`000000_init.sql` a `000016_...sql`):
    ```bash
+   npx supabase db push --dry-run
    npm run db:push
    ```
-4. Desplegar las Edge Functions seguras:
+   La migración `20261103000015_cron_and_push_idempotency.sql` contiene el rate limit
+   server-side y la idempotencia de push. No debe quedar fuera del despliegue.
+4. Ejecutar el lint de base de datos y los tests de seguridad en local:
+   ```bash
+   npm run db:start   # prepara el stack local (incluye el bootstrap de Realtime)
+   npx supabase db lint
+   npm run test:db
+   ```
+   `npm run db:reset` detiene el stack sin backup y lo reconstruye con el seed local.
+5. Desplegar las Edge Functions seguras:
    ```bash
    npm run functions:deploy
    ```
-5. Configurar los secretos de las Edge Functions en Supabase Cloud:
+6. Configurar los secretos de las Edge Functions en Supabase Cloud:
    ```bash
-   npx supabase secrets set SUPABASE_SERVICE_ROLE_KEY="tu_service_role_key"
    npx supabase secrets set LIVEKIT_URL="wss://tu-servidor.livekit.cloud"
    npx supabase secrets set LIVEKIT_API_KEY="tu_api_key"
    npx supabase secrets set LIVEKIT_API_SECRET="tu_api_secret"
+   npx supabase secrets set PUSH_WEBHOOK_SECRET="un-secreto-largo-y-aleatorio"
    ```
+   No configures `TURNSTILE_SECRET_KEY` en la v1: la app todavía no renderiza el
+   widget de Turnstile. Si se define, `auth-login` exigirá un token que el cliente
+   aún no envía y los inicios de sesión por `@username` fallarán con 403.
 
 ---
 
@@ -118,7 +134,8 @@ En el Dashboard de Producción de Supabase (`Authentication` -> `Providers` / `S
    - `Rate Limits`: Establecer `Max Frequency` para reseteos y confirmaciones en **60 segundos** (`max_frequency = "60s"`).
    - Activar `Secure password change` (requiere reautenticación para cambios de contraseña).
 4. **Protección Anti-Bot (Captcha / Cloudflare Turnstile)**:
-   - En `Authentication` -> `Bot Detection`: Activar **Cloudflare Turnstile** con tu Site Key y Secret Key para blindar los endpoints de registro e inicio de sesión contra ataques de fuerza bruta y credential stuffing.
+   - La v1 se lanza con Turnstile **desactivado** (`[auth.captcha] enabled = false`) y rate limits server-side. No configures `TURNSTILE_SECRET_KEY` todavía.
+   - Para activarlo en v1.1: renderiza el widget en la app, envía `captchaToken` a `supabase.auth.signUp/signInWithPassword` y `turnstileToken` a `auth-login`; recién entonces activa Bot Detection en el Dashboard y define el secreto.
 
 ---
 
@@ -160,7 +177,9 @@ Para evitar que otras apps instaladas secuestren enlaces y sesiones mediante el 
 ## 7. Requisitos de Publicación en App Store y Google Play
 
 1. **Eliminación de Cuenta (App Store Guideline 5.1.1(v))**:
-   - La app incluye en Ajustes el botón destructivo **"Eliminar mi cuenta"**, que ejecuta `public.delete_my_account()` borrando en cascada los datos del usuario en la base de datos y sus archivos en Storage.
+   - La app incluye en Ajustes el botón destructivo **"Eliminar mi cuenta"**, que ejecuta `public.delete_my_account()`.
+   - Se eliminan el perfil, avatar, estados, tokens y el contenido de los mensajes enviados. En las conversaciones de otras personas esos mensajes quedan como **"eliminado"**. Las copias de seguridad cifradas pueden persistir durante el periodo de retención del proveedor.
+   - Los objetos físicos huérfanos de S3 deben purgarse con un job que use la Storage API; la eliminación directa de `storage.objects` no borra el archivo subyacente. Esto queda como tarea P2 de operación.
 2. **Moderación de Contenido Generado por Usuarios (Apple Guideline 1.2)**:
    - Política de Tolerancia Cero implementada en [`src/app/(app)/legal.tsx`](file:///Users/rosangeles/Documents/redup/src/app/(app)/legal.tsx).
    - Bloqueo inmediato de usuarios.
@@ -172,23 +191,40 @@ Para evitar que otras apps instaladas secuestren enlaces y sesiones mediante el 
 ## 8. Actualizaciones OTA y Monitoreo
 
 1. **EAS Update (Over-The-Air Updates)**:
-   - Permite publicar parches críticos de JS/assets al instante sin pasar por revisión de las tiendas:
+   - Ejecuta una vez `npx eas update:configure` para que EAS asigne `updates.url` y el canal. `app.json` ya declara `runtimeVersion` con política `appVersion`.
+   - Publica parches de JS/assets sin pasar por revisión:
      ```bash
      npx eas update --channel production --message "Parche de seguridad crítico"
      ```
 2. **Monitoreo de Errores (Sentry)**:
-   - Integrar `@sentry/react-native`:
-     ```bash
-     npx expo install @sentry/react-native
-     ```
-   - El módulo [`src/lib/error-reporting.ts`](file:///Users/rosangeles/Documents/redup/src/lib/error-reporting.ts) ya está preparado para redirigir automáticamente los reportes a Sentry en producción.
+   - `@sentry/react-native` y `expo-updates` ya están instalados; `src/lib/error-reporting.ts` inicializa Sentry si existe `EXPO_PUBLIC_SENTRY_DSN`.
+   - Configura `EXPO_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` y `SENTRY_PROJECT` en EAS para subir source maps.
+   - Recomendado: envolver el árbol raíz con `Sentry.wrap` para capturar errores de render y trazas de navegación.
 
 ---
 
-## 6. Pipeline de Integración Continua (CI)
+## 9. Pipeline de Integración Continua (CI)
 
 El proyecto incluye el flujo automatizado [`.github/workflows/ci.yml`](file:///Users/rosangeles/Documents/redup/.github/workflows/ci.yml) que en cada `push` y `pull request` ejecuta:
 1. `npx expo-doctor` (integridad de dependencias y schema Expo SDK 58).
 2. `npx expo lint` (calidad de código sin advertencias).
 3. `npx tsc --noEmit` (tipado estricto TypeScript).
+4. `npx supabase start`, `npx supabase db lint` y `npm run test:db` (RLS, RPCs y regresiones de seguridad).
+
+---
+
+## 10. Checklist mínimo antes de enviar a tiendas
+
+- [ ] `extra.eas.projectId` completo y `submit.production` configurado (`ascAppId`, `appleTeamId`, service account de Google).
+- [ ] Credenciales APNs/FCM cargadas en EAS y push probado en dispositivo físico.
+- [ ] Proyecto Supabase de producción enlazado y migraciones `000000`–`000016` aplicadas.
+- [ ] `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` y `EXPO_PUBLIC_SENTRY_DSN` definidos en EAS.
+- [ ] `site_url` y Redirect URLs de Supabase apuntando al dominio/HTTPS y a `redup://**`.
+- [ ] `https://redup.app/.well-known/apple-app-site-association` y `assetlinks.json` publicados.
+- [ ] SMTP transaccional (Resend/SendGrid/Postmark) con SPF, DKIM y DMARC.
+- [ ] URL pública de privacidad y términos para App Store Connect y Play Console.
+- [ ] Data Safety de Google Play, clasificación por edad y screenshots.
+- [ ] `ITSAppUsesNonExemptEncryption` declarado (ya está en `app.json`).
+- [ ] `npx expo-doctor`, `npx expo lint`, `npx tsc --noEmit`, `npx supabase db lint` y `npm run test:db` en verde.
+- [ ] Build de producción probado en TestFlight / internal testing.
 

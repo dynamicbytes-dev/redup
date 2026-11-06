@@ -4,7 +4,9 @@
 // 1. Resuelve el correo internamente con service_role en el servidor.
 // 2. JAMÁS devuelve el correo electrónico al cliente antes de que la contraseña sea verificada.
 // 3. Rate limiting server-side distribuido por IP y por cuenta mediante Postgres.
-// 4. Verificación de bot / Cloudflare Turnstile obligatoria.
+// 4. Verificación de bot / Cloudflare Turnstile cuando TURNSTILE_SECRET_KEY
+//    está configurada. En la v1 se mantiene desactivada hasta que la app
+//    renderice el widget y envíe turnstileToken.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { securityResponse } from '../_shared/security-headers.ts';

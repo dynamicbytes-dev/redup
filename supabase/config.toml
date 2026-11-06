@@ -163,6 +163,7 @@ site_url = "redup://"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
   "redup://**",
+  "exp://**",
   "http://localhost:8081/**",
   "http://127.0.0.1:8081/**",
 ]
@@ -218,7 +219,9 @@ web3 = 30
 
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
 [auth.captcha]
-# Se activa en producción en el Supabase Dashboard (Auth -> Bot Detection / Turnstile)
+# Desactivado en la v1: la app todavía no renderiza el widget de Turnstile.
+# No configures TURNSTILE_SECRET_KEY hasta implementar el widget en el cliente;
+# de lo contrario los inicios de sesión por @username fallarán con 403.
 enabled = false
 provider = "turnstile"
 secret = "env(TURNSTILE_SECRET_KEY)"
@@ -389,6 +392,23 @@ enabled = false
 authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
+
+# ----------------------------------------------------------------------------
+# Edge Functions: verificación JWT en el gateway
+# ----------------------------------------------------------------------------
+# auth-login es pre-autenticación: valida credenciales, rate limits y Turnstile
+# dentro de la función. El gateway no debe exigir un JWT previo.
+[functions.auth-login]
+verify_jwt = false
+
+# push-notify acepta un JWT de usuario o un webhook con secreto; la función
+# valida ambos casos. El gateway no debe bloquear el path de webhook.
+[functions.push-notify]
+verify_jwt = false
+
+# livekit-token solo se invoca con una sesión de usuario válida.
+[functions.livekit-token]
+verify_jwt = true
 
 [edge_runtime]
 enabled = true

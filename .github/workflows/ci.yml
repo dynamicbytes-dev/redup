@@ -14,6 +14,7 @@ jobs:
   validate:
     name: Verificación de Código y Dependencias
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Descargar código fuente
@@ -36,4 +37,13 @@ jobs:
 
       - name: Verificación de Tipos TypeScript
         run: npx tsc --noEmit
+
+      - name: Iniciar Supabase local
+        run: npm run db:start
+
+      - name: Lint de base de datos
+        run: npx supabase db lint
+
+      - name: Tests de seguridad y RLS
+        run: npm run test:db
 
