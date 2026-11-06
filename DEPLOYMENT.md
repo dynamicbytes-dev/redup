@@ -62,6 +62,16 @@ El proyecto cuenta con [`eas.json`](file:///Users/rosangeles/Documents/redup/eas
    ```
    La migración `20261103000015_cron_and_push_idempotency.sql` contiene el rate limit
    server-side y la idempotencia de push. No debe quedar fuera del despliegue.
+
+   > **Realtime y ownership:** en el stack local el rol `postgres` no es dueño de
+   > `realtime.messages`, así que `supabase start` directo falla en la migración
+   > `20261103000010`. Por eso `npm run db:start` arranca sin migraciones, concede
+   > `supabase_realtime_admin` a `postgres` dentro del contenedor y después aplica
+   > todo. En Supabase Cloud, si `db push` falla con
+   > `must be owner of table messages`, aplica la migración `000010` desde el SQL
+   > Editor y vuelve a ejecutar `db push`; si persiste, abre un ticket a soporte
+   > de Supabase para que revise la ownership de la tabla.
+
 4. Ejecutar el lint de base de datos y los tests de seguridad en local:
    ```bash
    npm run db:start   # prepara el stack local (incluye el bootstrap de Realtime)
