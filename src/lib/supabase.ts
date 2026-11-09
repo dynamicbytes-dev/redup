@@ -41,8 +41,10 @@ const resilientFetch: typeof fetch = async (input, init) => {
       [
         preferred,
         '127.0.0.1',
-        currentHost,
         metroHost && metroHost !== 'localhost' ? metroHost : null,
+        // En desarrollo, fallback a la IP LAN de la máquina por si el túnel USB se desconecta
+        __DEV__ ? '192.168.1.11' : null,
+        currentHost,
         Platform.OS === 'android' ? '10.0.2.2' : null,
       ].filter((h): h is string => Boolean(h)),
     ),
@@ -51,13 +53,37 @@ const resilientFetch: typeof fetch = async (input, init) => {
   let lastError: unknown;
   for (const host of candidates) {
     const targetUrl = rawUrl.replace(/\/\/([^:/]+):54321/, `//${host}:54321`);
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    if (init?.signal) {
+      if (init.signal.aborted) {
+        throw new Error('Aborted');
+      }
+      init.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+
+    // En el host activo o preferido, damos 15s para operaciones pesadas (signup, hashing, mails).
+    // Para candidatos no verificados damos 6s antes de conmutar al siguiente host.
+    const timeoutMs = (preferred && preferred === host) ? 15000 : 8000;
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
-      const response = await fetch(targetUrl, init);
+      const response = await fetch(targetUrl, {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
       if (preferred !== host) {
         setActiveLocalHostOverride(host);
       }
       return response;
     } catch (err) {
+      clearTimeout(timer);
+      if (init?.signal?.aborted) {
+        throw err;
+      }
       lastError = err;
     }
   }

@@ -85,10 +85,19 @@ export const secureStorage = {
     try {
       const val = await readSecureChunks(key);
       if (val !== null) {
-        // Limpieza defensiva en AsyncStorage por si quedó un remanente no cifrado antiguo
+        // Limpieza defensiva en AsyncStorage por si quedó un remanente antiguo
         AsyncStorage.removeItem(key).catch(() => {});
         return val;
       }
+
+      // Si no estaba en SecureStore, verificar si existía en AsyncStorage para migrarlo
+      const legacyVal = await AsyncStorage.getItem(key).catch(() => null);
+      if (legacyVal) {
+        await writeSecureChunks(key, legacyVal).catch(() => {});
+        await AsyncStorage.removeItem(key).catch(() => {});
+        return legacyVal;
+      }
+
       return null;
     } catch {
       return null;
