@@ -1,0 +1,84 @@
+# ==============================================================================
+# .dockerignore · Proyecto Expo / React Native (redup)
+# Optimizado para minimizar el contexto de compilación y evitar fugas de secretos
+# ==============================================================================
+
+# Dependencias locales (se reinstalan limpiamente en el contenedor)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+
+# Control de versiones (VCS)
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Salidas de compilación y bundles web/móvil
+dist/
+build/
+web-build/
+.expo/
+.expo-shared/
+
+# Carpetas y artefactos nativos móviles (Continuous Native Generation / Gradle / Xcode)
+android/
+ios/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Variables de entorno y secretos sensibles (NUNCA incluir en la imagen)
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+!.env.production.example
+
+# Supabase local y estado de CLI
+.supabase/
+supabase/.branches/
+supabase/.temp/
+supabase/tests/
+
+# Herramientas de despliegue y CI/CD móvil
+eas.json
+.eas/
+
+# Cobertura y pruebas
+coverage/
+.nyc_output/
+*.lcov
+
+# Configuraciones de editores e IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Archivos temporales y de sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentación del repositorio innecesaria en runtime
+README.md
+DEPLOYMENT.md
+LICENSE
+AGENTS.md
