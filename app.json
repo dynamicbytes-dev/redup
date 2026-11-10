@@ -45,6 +45,12 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {
@@ -84,7 +90,15 @@
       "./plugins/with-android-sdk",
       "expo-secure-store",
       "expo-asset",
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "dynamicbytes-dev"
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true
@@ -96,7 +110,12 @@
     },
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "2e169d4e-b200-41d9-9c12-9c984ebfb65b"
+      },
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
       }
     }
   }

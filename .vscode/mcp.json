@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "Sentry": {
+      "url": "https://mcp.sentry.dev/mcp/dynamicbytes-dev/react-native",
+      "type": "http"
+    }
+  }
+}

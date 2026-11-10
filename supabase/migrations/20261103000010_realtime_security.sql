@@ -137,7 +137,7 @@ $$;
 grant execute on function public.can_broadcast_realtime_topic(text, uuid) to authenticated, anon;
 
 -- 3. Políticas RLS en la tabla del sistema realtime.messages
-alter table realtime.messages enable row level security;
+
 
 drop policy if exists "realtime_messages_select_authorized" on realtime.messages;
 create policy "realtime_messages_select_authorized"
