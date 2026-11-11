@@ -3,7 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -31,6 +34,8 @@ import {
   useCreateTextStatus,
   useDeleteStatus,
   useMarkStatusViewed,
+  useReactToStatus,
+  useReplyToStatus,
   useStatuses,
   useStatusesRealtime,
 } from '@/features/status/hooks';
@@ -75,6 +80,8 @@ export default function StatusScreen() {
   const createImage = useCreateImageStatus(userId ?? '', authorSummary);
   const markViewed = useMarkStatusViewed(userId ?? '');
   const removeStatus = useDeleteStatus();
+  const reactStatus = useReactToStatus(userId ?? '');
+  const replyStatus = useReplyToStatus(userId ?? '');
 
   const [refreshing, setRefreshing] = useState(false);
   const [textModalOpen, setTextModalOpen] = useState(false);
@@ -474,6 +481,12 @@ export default function StatusScreen() {
         contactsMap={contactsMap}
         onClose={() => setViewerTarget(null)}
         onViewed={(statusId) => markViewed.mutate(statusId)}
+        onReact={async (status, reaction) => {
+          await reactStatus.mutateAsync({ status, reaction });
+        }}
+        onReply={async (status, text) => {
+          await replyStatus.mutateAsync({ status, text });
+        }}
         onDelete={(status) => {
           removeStatus.mutate(
             { statusId: status.id, mediaPath: status.media_path },
@@ -830,6 +843,8 @@ function ImageStatusComposerModal({
   );
 }
 
+const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
+
 function StatusViewerModal({
   group,
   initialIndex,
@@ -837,6 +852,8 @@ function StatusViewerModal({
   contactsMap,
   onClose,
   onViewed,
+  onReact,
+  onReply,
   onDelete,
 }: {
   group: StatusAuthorGroup | null;
@@ -845,6 +862,8 @@ function StatusViewerModal({
   contactsMap: Record<string, string>;
   onClose: () => void;
   onViewed: (statusId: string) => void;
+  onReact: (status: StatusItem, reaction: string) => Promise<void>;
+  onReply: (status: StatusItem, text: string) => Promise<void>;
   onDelete: (status: StatusItem) => void;
 }) {
   const { colors } = useTheme();
@@ -853,12 +872,24 @@ function StatusViewerModal({
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [viewersOpen, setViewersOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [floatingEmoji, setFloatingEmoji] = useState<string | null>(null);
   const [reportTarget, setReportTarget] = useState<{
     contentType: 'status';
     contentId: string;
     reportedUserId: string;
     displayName: string;
   } | null>(null);
+
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showToast(msg: string) {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMessage(msg);
+    toastTimerRef.current = setTimeout(() => setToastMessage(null), 2500);
+  }
 
   const viewedIdsRef = useRef<Set<string>>(new Set());
   const onViewedRef = useRef(onViewed);
@@ -886,14 +917,14 @@ function StatusViewerModal({
 
   // Avance automático cada 5 segundos
   useEffect(() => {
-    if (!group || !currentId || paused || viewersOpen) return;
+    if (!group || !currentId || paused || viewersOpen || isReplying || sending) return;
 
     const timer = setInterval(() => {
       setProgress((prev) => Math.min(1, prev + 0.02));
     }, 100);
 
     return () => clearInterval(timer);
-  }, [group, currentId, paused, viewersOpen]);
+  }, [group, currentId, paused, viewersOpen, isReplying, sending]);
 
   // Pasar al siguiente estado o cerrar al llegar al 100 %
   useEffect(() => {
@@ -924,6 +955,43 @@ function StatusViewerModal({
   }, [current?.id, current?.kind, current?.media_path]);
 
   if (!group || !current) return null;
+
+  async function handleQuickReact(emoji: string) {
+    if (!current || sending) return;
+    setPaused(true);
+    setFloatingEmoji(emoji);
+    try {
+      await onReact(current, emoji);
+      showToast(`Reaccionaste con ${emoji}`);
+    } catch {
+      showToast('No pudimos enviar la reacción');
+    } finally {
+      setTimeout(() => {
+        setFloatingEmoji(null);
+        setPaused(false);
+      }, 1000);
+    }
+  }
+
+  async function handleSendReply() {
+    const text = replyText.trim();
+    if (!text || !current || sending) return;
+    setSending(true);
+    Keyboard.dismiss();
+    try {
+      await onReply(current, text);
+      setReplyText('');
+      setIsReplying(false);
+      showToast(`Respuesta enviada a ${group?.displayName ?? 'usuario'}`);
+      setTimeout(() => {
+        setPaused(false);
+        setSending(false);
+      }, 600);
+    } catch {
+      setSending(false);
+      showToast('No pudimos enviar la respuesta');
+    }
+  }
 
   function goPrev() {
     setProgress(0);
@@ -1138,8 +1206,152 @@ function StatusViewerModal({
                 </AppText>
               </Pressable>
             </View>
-          ) : null}
+          ) : (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
+              <View
+                style={{
+                  paddingHorizontal: 14,
+                  paddingTop: 8,
+                  paddingBottom: Math.max(insets.bottom, 10),
+                  backgroundColor: 'rgba(0,0,0,0.45)',
+                  borderTopWidth: 1,
+                  borderTopColor: 'rgba(255,255,255,0.08)',
+                }}>
+                {/* Fila de reacciones rápidas */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                    marginBottom: 10,
+                  }}>
+                  {QUICK_REACTIONS.map((emoji) => (
+                    <Pressable
+                      key={emoji}
+                      onPress={() => handleQuickReact(emoji)}
+                      hitSlop={6}
+                      style={({ pressed }) => ({
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        backgroundColor: 'rgba(255,255,255,0.16)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transform: [{ scale: pressed ? 1.25 : 1 }],
+                      })}>
+                      <AppText style={{ fontSize: 23 }}>{emoji}</AppText>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Input para responder al autor */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.16)',
+                    borderRadius: 24,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.25)',
+                    paddingHorizontal: 14,
+                    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+                    gap: 10,
+                  }}>
+                  <TextInput
+                    value={replyText}
+                    onChangeText={setReplyText}
+                    onFocus={() => {
+                      setIsReplying(true);
+                      setPaused(true);
+                    }}
+                    onBlur={() => {
+                      if (!replyText.trim()) {
+                        setIsReplying(false);
+                        setPaused(false);
+                      }
+                    }}
+                    placeholder={`Responder a ${group.displayName}…`}
+                    placeholderTextColor="rgba(255,255,255,0.65)"
+                    style={{
+                      flex: 1,
+                      color: '#FFFFFF',
+                      fontSize: 15,
+                      paddingVertical: 4,
+                    }}
+                    returnKeyType="send"
+                    onSubmitEditing={handleSendReply}
+                  />
+
+                  {replyText.trim().length > 0 ? (
+                    <Pressable
+                      onPress={handleSendReply}
+                      disabled={sending}
+                      style={({ pressed }) => ({
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        backgroundColor: colors.accent,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transform: [{ scale: pressed ? 0.9 : 1 }],
+                      })}>
+                      {sending ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Icon name="arrow-up" size={18} color="#FFFFFF" />
+                      )}
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          )}
         </SafeAreaView>
+
+        {/* Reacción flotante al centro */}
+        {floatingEmoji ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <AppText style={{ fontSize: 80 }}>{floatingEmoji}</AppText>
+          </View>
+        ) : null}
+
+        {/* Toast flotante */}
+        {toastMessage ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              bottom: isMine ? 70 : 150,
+              alignSelf: 'center',
+              backgroundColor: 'rgba(15,14,24,0.92)',
+              borderRadius: 20,
+              paddingHorizontal: 18,
+              paddingVertical: 9,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.2)',
+              shadowColor: '#000',
+              shadowOpacity: 0.35,
+              shadowRadius: 10,
+              elevation: 8,
+            }}>
+            <AppText style={{ color: '#FFFFFF', fontSize: 13.5, fontWeight: '600' }}>
+              {toastMessage}
+            </AppText>
+          </View>
+        ) : null}
 
         {/* Modal de espectadores */}
         <Modal
@@ -1206,7 +1418,22 @@ function StatusViewerModal({
                           size={40}
                         />
                         <View style={{ flex: 1 }}>
-                          <AppText variant="bodyStrong">{name}</AppText>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <AppText variant="bodyStrong">{name}</AppText>
+                            {viewer.reaction ? (
+                              <View
+                                style={{
+                                  backgroundColor: colors.surface,
+                                  borderRadius: 8,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 1,
+                                  borderWidth: 1,
+                                  borderColor: colors.border,
+                                }}>
+                                <AppText style={{ fontSize: 14 }}>{viewer.reaction}</AppText>
+                              </View>
+                            ) : null}
+                          </View>
                           {viewer.profile?.username ? (
                             <AppText variant="micro" color={colors.textMuted}>
                               @{viewer.profile.username}

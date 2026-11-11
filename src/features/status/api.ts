@@ -3,10 +3,11 @@ import * as Crypto from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
+import { createDirectConversation, insertMessage } from '@/features/chats/api';
 import { compressToJpeg } from '@/features/profile/api';
 import { assertRateLimit, validateStatusCaption } from '@/lib/security';
 import { supabase } from '@/lib/supabase';
-import type { StatusItem, StatusViewer } from '@/lib/types';
+import type { StatusItem, StatusViewer, StoryReplyMeta } from '@/lib/types';
 
 export class StatusError extends Error {}
 
@@ -25,6 +26,7 @@ type RawStatusRow = {
   views?: {
     viewer_id: string;
     viewed_at: string;
+    reaction?: string | null;
     profile: StatusViewer['profile'];
   }[];
 };
@@ -98,7 +100,7 @@ export async function fetchActiveStatuses(currentUserId: string): Promise<Status
   const { data, error } = await supabase
     .from('statuses')
     .select(
-      'id, user_id, kind, caption, bg_color, media_path, created_at, expires_at, author:profiles!statuses_user_id_fkey(id, username, display_name, avatar_path), views:status_views(viewer_id, viewed_at, profile:profiles!status_views_viewer_id_fkey(id, username, display_name, avatar_path))',
+      'id, user_id, kind, caption, bg_color, media_path, created_at, expires_at, author:profiles!statuses_user_id_fkey(id, username, display_name, avatar_path), views:status_views(viewer_id, viewed_at, reaction, profile:profiles!status_views_viewer_id_fkey(id, username, display_name, avatar_path))',
     )
     .gt('expires_at', nowIso)
     .order('created_at', { ascending: true });
@@ -120,6 +122,7 @@ export async function fetchActiveStatuses(currentUserId: string): Promise<Status
     const viewers: StatusViewer[] = (row.views ?? []).map((v) => ({
       viewer_id: v.viewer_id,
       viewed_at: v.viewed_at,
+      reaction: v.reaction ?? null,
       profile: v.profile ?? null,
     }));
     return {
@@ -304,5 +307,82 @@ export async function deleteStatus(
     }
     throw new StatusError('No pudimos eliminar el estado.');
   }
+}
+
+export async function reactToStatus(
+  statusId: string,
+  viewerId: string,
+  reaction: string,
+): Promise<void> {
+  const clean = reaction.trim();
+  const { error } = await supabase.rpc('react_to_status', {
+    p_status_id: statusId,
+    p_reaction: clean,
+  });
+
+  if (error) {
+    const { error: upsertErr } = await supabase.from('status_views').upsert({
+      status_id: statusId,
+      viewer_id: viewerId,
+      viewed_at: new Date().toISOString(),
+      reaction: clean,
+    });
+    if (upsertErr && isMissingTableError(upsertErr)) {
+      const existing = await readFallbackStatuses();
+      const updated = existing.map((item) => {
+        if (item.id !== statusId) return item;
+        const otherViewers = item.viewers.filter((v) => v.viewer_id !== viewerId);
+        return {
+          ...item,
+          viewers: [
+            ...otherViewers,
+            { viewer_id: viewerId, viewed_at: new Date().toISOString(), reaction: clean, profile: null },
+          ],
+        };
+      });
+      await writeFallbackStatuses(updated);
+    }
+  }
+}
+
+export async function sendStatusReply({
+  status,
+  senderId,
+  text,
+  isReaction = false,
+}: {
+  status: StatusItem;
+  senderId: string;
+  text: string;
+  isReaction?: boolean;
+}): Promise<string> {
+  const cleanText = text.trim();
+  if (!cleanText) throw new StatusError('La respuesta no puede estar vacía.');
+
+  // Obtener o crear conversación directa con el autor de la historia
+  const conversationId = await createDirectConversation(status.user_id);
+
+  const storyReplyMeta: StoryReplyMeta = {
+    status_id: status.id,
+    kind: status.kind,
+    caption: status.caption,
+    media_path: status.media_path,
+    bg_color: status.bg_color,
+    author_name: status.author?.display_name ?? null,
+  };
+
+  await insertMessage({
+    id: Crypto.randomUUID(),
+    conversationId,
+    senderId,
+    kind: 'text',
+    body: cleanText,
+    mediaMeta: {
+      story_reply: storyReplyMeta,
+      is_story_reaction: isReaction,
+    },
+  });
+
+  return conversationId;
 }
 

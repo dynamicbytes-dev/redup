@@ -16,7 +16,7 @@ import {
   messagePreview,
 } from '@/lib/format';
 import { useSignedMediaUrl } from '@/lib/storage';
-import type { ChatMessage, Message } from '@/lib/types';
+import type { ChatMessage, Message, StoryReplyMeta } from '@/lib/types';
 import { useTheme } from '@/theme';
 
 type Props = {
@@ -72,6 +72,10 @@ export function MessageBubble({
   }
 
   const deleted = Boolean(message.deleted_at);
+  const storyReply = (message.media_meta as { story_reply?: StoryReplyMeta } | null)?.story_reply;
+  const isStoryReaction = Boolean(
+    (message.media_meta as { is_story_reaction?: boolean } | null)?.is_story_reaction,
+  );
   const bg = isMine ? colors.bubbleOut : colors.bubbleIn;
   const fg = isMine ? colors.bubbleOutText : colors.bubbleInText;
   const senderColor = avatarTint(message.sender_id ?? senderName);
@@ -150,6 +154,10 @@ export function MessageBubble({
           </View>
         ) : null}
 
+        {storyReply && !deleted ? (
+          <StoryReplyHeader storyReply={storyReply} isMine={isMine} />
+        ) : null}
+
         {deleted ? (
           <AppText
             style={{
@@ -171,6 +179,16 @@ export function MessageBubble({
           <AudioBubbleContent message={message} isMine={isMine} />
         ) : message.kind === 'file' ? (
           <FileBubbleContent message={message} isMine={isMine} fg={fg} />
+        ) : isStoryReaction ? (
+          <AppText
+            style={{
+              fontSize: 34,
+              lineHeight: 40,
+              textAlign: isMine ? 'right' : 'left',
+              paddingVertical: 2,
+            }}>
+            {message.body}
+          </AppText>
         ) : (
           <AppText style={{ color: fg, fontSize: 15.5, lineHeight: 21 }}>{message.body}</AppText>
         )}
@@ -519,6 +537,82 @@ function FileBubbleContent({
       {message.body ? (
         <AppText style={{ color: fg, fontSize: 15, lineHeight: 20 }}>{message.body}</AppText>
       ) : null}
+    </View>
+  );
+}
+
+function StoryReplyHeader({
+  storyReply,
+  isMine,
+}: {
+  storyReply: StoryReplyMeta;
+  isMine: boolean;
+}) {
+  const { colors } = useTheme();
+  const isImage = storyReply.kind === 'image';
+  const signedUrl = useSignedMediaUrl(isImage ? storyReply.media_path : null);
+
+  return (
+    <View
+      style={{
+        borderLeftWidth: 3,
+        borderLeftColor: isMine ? 'rgba(255,255,255,0.7)' : colors.primary,
+        backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : colors.surfaceAlt,
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        marginBottom: 4,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+      }}>
+      {isImage && signedUrl ? (
+        <Image
+          source={{ uri: signedUrl }}
+          style={{ width: 36, height: 36, borderRadius: 6 }}
+          contentFit="cover"
+        />
+      ) : (
+        <View
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 6,
+            backgroundColor: storyReply.bg_color || colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name="flash-outline" size={16} color="#FFFFFF" />
+        </View>
+      )}
+
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Icon
+            name="arrow-undo-outline"
+            size={12}
+            color={isMine ? 'rgba(255,255,255,0.9)' : colors.primary}
+          />
+          <AppText
+            variant="micro"
+            style={{
+              color: isMine ? '#FFFFFF' : colors.primary,
+              fontWeight: '700',
+            }}>
+            {isMine ? 'Respondiste a un estado' : 'Respondió a tu estado'}
+          </AppText>
+        </View>
+
+        <AppText
+          variant="caption"
+          numberOfLines={1}
+          style={{
+            color: isMine ? 'rgba(255,255,255,0.85)' : colors.textMuted,
+            marginTop: 1,
+          }}>
+          {storyReply.caption || (isImage ? 'Foto de estado' : 'Estado')}
+        </AppText>
+      </View>
     </View>
   );
 }

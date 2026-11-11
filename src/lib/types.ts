@@ -108,7 +108,17 @@ export type StatusKind = 'text' | 'image';
 export type StatusViewer = {
   viewer_id: string;
   viewed_at: string;
+  reaction?: string | null;
   profile: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path'> | null;
+};
+
+export type StoryReplyMeta = {
+  status_id: string;
+  kind: StatusKind;
+  caption: string | null;
+  media_path: string | null;
+  bg_color: string;
+  author_name?: string | null;
 };
 
 export type StatusItem = {

@@ -12,6 +12,8 @@ import {
   deleteStatus,
   fetchActiveStatuses,
   markStatusViewed,
+  reactToStatus,
+  sendStatusReply,
 } from './api';
 
 export function useStatuses(userId: string | null) {
@@ -119,6 +121,56 @@ export function useDeleteStatus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.statuses });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    },
+  });
+}
+
+export function useReactToStatus(viewerId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      status,
+      reaction,
+      sendToChat = true,
+    }: {
+      status: StatusItem;
+      reaction: string;
+      sendToChat?: boolean;
+    }) => {
+      await reactToStatus(status.id, viewerId, reaction);
+      if (sendToChat) {
+        await sendStatusReply({
+          status,
+          senderId: viewerId,
+          text: reaction,
+          isReaction: true,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.statuses });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    },
+  });
+}
+
+export function useReplyToStatus(senderId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ status, text }: { status: StatusItem; text: string }) => {
+      return sendStatusReply({
+        status,
+        senderId,
+        text,
+        isReaction: false,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     },
   });
 }
