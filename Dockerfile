@@ -1,88 +1,101 @@
 # syntax=docker/dockerfile:1
 
 # ==============================================================================
-# Dockerfile para Expo Router (Web) en Producción
-# Stack: Expo SDK 58 · React Native · TypeScript · Expo Router · Supabase Cloud
-# Arquitectura: Multi-stage build con node:20-alpine
+# Redup · Build web (Expo Router) para producción
+# Stack: Expo SDK 58 · React Native Web · TypeScript · Supabase Cloud
+#
+# Uso:
+#   docker build \
+#     --build-arg EXPO_PUBLIC_SUPABASE_URL=https://cctpntjrlduntjjpjpcb.supabase.co \
+#     --build-arg EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon_key> \
+#     -t redup-web .
+#
+#   docker run -d --name redup-web --restart unless-stopped -p 3000:3000 redup-web
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# Etapa 1: Instalación de dependencias de compilación (deps)
-# ------------------------------------------------------------------------------
-FROM node:20-alpine AS deps
+ARG NODE_VERSION=22
 
-# libc6-compat para compatibilidad de herramientas nativas y bundlers en Alpine
-RUN apk add --no-cache libc6-compat
+# ------------------------------------------------------------------------------
+# Etapa 1: dependencias (capa cacheable)
+# ------------------------------------------------------------------------------
+FROM node:${NODE_VERSION}-bookworm-slim AS deps
 
 WORKDIR /app
 
-# Copiar descriptores de paquetes primero para maximizar caché de capas Docker
-COPY package*.json ./
+# Copiar solo los descriptores para aprovechar la caché de Docker
+COPY package.json package-lock.json ./
 
-# Instalar dependencias exactas y reproducibles
-RUN npm ci
+# Instalación reproducible. No se define NODE_ENV=production aquí para que
+# npm instale también devDependencies (necesarias para el export de Expo).
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
 
 # ------------------------------------------------------------------------------
-# Etapa 2: Compilación de la aplicación web con Expo Router (builder)
+# Etapa 2: compilación del bundle web estático
 # ------------------------------------------------------------------------------
-FROM node:20-alpine AS builder
+FROM node:${NODE_VERSION}-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Variables de entorno públicas de Supabase para inyección durante el build
-# En Expo, las variables EXPO_PUBLIC_* deben estar disponibles en tiempo de compilación
-# para ser incrustadas en los bundles estáticos de cliente
+# Variables EXPO_PUBLIC_*: Expo las inserta en el bundle en tiempo de build.
+# No son secretos reales (la anon key es pública), pero no deben hardcodearse
+# en la imagen ni en el repositorio.
 ARG EXPO_PUBLIC_SUPABASE_URL
 ARG EXPO_PUBLIC_SUPABASE_ANON_KEY
 
 ENV NODE_ENV=production \
-    EXPO_PUBLIC_SUPABASE_URL=$EXPO_PUBLIC_SUPABASE_URL \
+    CI=1 \
+    EXPO_NO_TELEMETRY=1
+
+# Fallar temprano si faltan variables obligatorias
+RUN test -n "$EXPO_PUBLIC_SUPABASE_URL" || \
+    (echo "ERROR: falta --build-arg EXPO_PUBLIC_SUPABASE_URL" >&2 && exit 1)
+RUN test -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" || \
+    (echo "ERROR: falta --build-arg EXPO_PUBLIC_SUPABASE_ANON_KEY" >&2 && exit 1)
+
+ENV EXPO_PUBLIC_SUPABASE_URL=$EXPO_PUBLIC_SUPABASE_URL \
     EXPO_PUBLIC_SUPABASE_ANON_KEY=$EXPO_PUBLIC_SUPABASE_ANON_KEY
 
-# Copiar dependencias de node_modules resueltas
+# Dependencias ya resueltas en la etapa anterior
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copiar el código fuente completo del proyecto
+# Código fuente (el contexto se filtra con .dockerignore)
 COPY . .
 
-# Compilar la aplicación web mediante el exportador oficial de Expo Router
-# Genera el bundle estático SPA optimizado en /app/dist
-RUN npx expo export --platform web
+# Export oficial de Expo Router. Genera la SPA estática en /app/dist.
+# Si en el futuro se usa LiveKit en el cliente, añadir aquí:
+#   ARG EXPO_PUBLIC_LIVEKIT_URL
+#   ENV EXPO_PUBLIC_LIVEKIT_URL=$EXPO_PUBLIC_LIVEKIT_URL
+RUN npx expo export --platform web --output-dir dist
 
 # ------------------------------------------------------------------------------
-# Etapa 3: Servidor de ejecución ligero en producción (runner)
+# Etapa 3: runtime mínimo (solo estáticos + servidor HTTP)
 # ------------------------------------------------------------------------------
-FROM node:20-alpine AS runner
+FROM node:${NODE_VERSION}-alpine AS runner
 
-# Instalar dumb-init para gestión limpia de señales de apagado (SIGTERM/SIGINT) en PID 1
-RUN apk add --no-cache dumb-init
+# dumb-init gestiona señales (SIGTERM/SIGINT) correctamente en PID 1.
+# `serve` es el servidor estático recomendado por Expo.
+RUN apk add --no-cache dumb-init \
+    && npm install -g serve@14.2.7 \
+    && npm cache clean --force
 
 WORKDIR /app
 
-# Variables de entorno del servidor
 ENV NODE_ENV=production \
     PORT=3000
 
-# Instalar el servidor HTTP 'serve' recomendado oficialmente por el equipo de Expo
-RUN npm install -g serve && npm cache clean --force
-
-# Copiar únicamente los artefactos web estáticos compilados desde la etapa builder
+# Solo se copian los artefactos compilados, nunca el código fuente ni .env
 COPY --from=builder --chown=node:node /app/dist ./dist
 
-# Ejecutar como usuario sin privilegios por seguridad (CIS Docker Benchmark)
+# Ejecutar sin privilegios
 USER node
 
-# Exponer el puerto de servicio web
 EXPOSE 3000
 
-# Healthcheck nativo para orquestadores (Kubernetes, AWS ECS, Docker Swarm)
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/ || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider "http://127.0.0.1:${PORT}/" || exit 1
 
-# dumb-init permite que las señales del orquestador apaguen el contenedor ordenadamente
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
-# -s (--single) activa el soporte de Single Page Application (SPA) para expo-router,
-# reescribiendo todas las rutas a index.html y evitando errores 404 al navegar
+# -s (--single) reescribe todas las rutas a index.html para Expo Router (SPA)
 CMD ["serve", "-s", "dist", "-l", "3000"]
-

@@ -22,10 +22,21 @@ El proyecto cuenta con [`eas.json`](file:///Users/rosangeles/Documents/redup/eas
 
 3. Configurar las variables de producción en EAS (entornos `production` y `preview`):
    ```bash
-   eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://tu-proyecto.supabase.co" --environment production --visibility plaintext
-   eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "tu_anon_key_de_produccion" --environment production --visibility sensitive
+   eas env:create --name EXPO_PUBLIC_SUPABASE_URL \
+     --value "https://cctpntjrlduntjjpjpcb.supabase.co" \
+     --environment production --visibility plaintext
+
+   # Obtén la anon key real del proyecto con:
+   #   npx supabase projects api-keys --project-ref cctpntjrlduntjjpjpcb
+   eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY \
+     --value "<anon_key_de_cctpntjrlduntjjpjpcb>" \
+     --environment production --visibility sensitive
    ```
    `eas secret:create` sigue funcionando pero está en modo legado; usa `eas env:create`.
+   Repite los comandos con `--environment preview` si compilas el perfil `preview`.
+
+   Para desarrollo local, el archivo `.env` ya apunta al proyecto de producción
+   `https://cctpntjrlduntjjpjpcb.supabase.co`.
 
 4. Compilar el APK o bundle de producción:
    ```bash
@@ -39,6 +50,46 @@ El proyecto cuenta con [`eas.json`](file:///Users/rosangeles/Documents/redup/eas
 
 5. **Notificaciones Push Remotas (FCM y APNs)**:
    - Al ejecutar `eas build`, EAS te guiará para subir tu clave `.p8` de Apple Developer (APNs) y el archivo `google-services.json` vinculado al proyecto de Firebase Cloud Messaging (FCM).
+
+### Servidor web de producción (Docker)
+
+La versión web se publica en la EC2 con IP pública **`18.191.49.251`**, servida por
+el `Dockerfile` en el puerto **3000**:
+
+```bash
+docker build \
+  --build-arg EXPO_PUBLIC_SUPABASE_URL=https://cctpntjrlduntjjpjpcb.supabase.co \
+  --build-arg EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon_key_de_produccion> \
+  -t redup-web .
+
+docker run -d --name redup-web --restart unless-stopped -p 3000:3000 redup-web
+```
+
+- El `Dockerfile` usa **Node 22** (requerido por Expo SDK 58) y un build multi-stage:
+  dependencias → export web → runtime mínimo con `serve`.
+- La imagen final solo contiene `dist/`; no incluye código fuente, `node_modules`
+  ni archivos `.env`. Las variables se inyectan con `--build-arg`.
+- `.dockerignore` excluye `node_modules/`, `android/`, `ios/`, `dist/`,
+  `supabase/`, `.env*`, documentación y artefactos de build.
+- Si compilas desde un Mac Apple Silicon para una EC2 x86_64, usa:
+  ```bash
+  docker buildx build --platform linux/amd64 \
+    --build-arg EXPO_PUBLIC_SUPABASE_URL=https://cctpntjrlduntjjpjpcb.supabase.co \
+    --build-arg EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon_key_de_produccion> \
+    -t redup-web --load .
+  ```
+- Verifica el contenedor con `docker ps` (debe mostrar `0.0.0.0:3000->3000/tcp`),
+  `docker logs -f redup-web` y `curl -I http://127.0.0.1:3000`.
+- Si pones Nginx/Caddy delante en 80/443, publica el contenedor solo en localhost
+  (`-p 127.0.0.1:3000:3000`) y **cierra el puerto 3000 en el Security Group**.
+- URL pública: `http://18.191.49.251:3000`
+- En **Supabase Dashboard → Authentication → URL Configuration** agrega como
+  *Redirect URLs*:
+  - `http://18.191.49.251:3000/**`
+  - `http://18.191.49.251:3000/reset-password`
+- Asegúrate de que el Security Group de AWS permita el puerto `3000` (TCP) y, si
+  publicas el dominio `redup.app`, coloca Nginx/Caddy delante para servir HTTPS y
+  los archivos `.well-known` de los deep links.
 
 ---
 
@@ -224,8 +275,9 @@ El proyecto incluye el flujo automatizado [`.github/workflows/ci.yml`](file:///U
 - [ ] `extra.eas.projectId` completo y `submit.production` configurado (`ascAppId`, `appleTeamId`, service account de Google).
 - [ ] Credenciales APNs/FCM cargadas en EAS y push probado en dispositivo físico.
 - [ ] Proyecto Supabase de producción enlazado y migraciones `000000`–`000016` aplicadas.
-- [ ] `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY` definidos en EAS.
-- [ ] `site_url` y Redirect URLs de Supabase apuntando al dominio/HTTPS y a `redup://**`.
+- [ ] `EXPO_PUBLIC_SUPABASE_URL=https://cctpntjrlduntjjpjpcb.supabase.co` y la anon key del proyecto definidos en EAS y en el build de Docker.
+- [ ] Build web desplegado en `http://18.191.49.251:3000` y puerto `3000` abierto en el Security Group.
+- [ ] `site_url` y Redirect URLs de Supabase apuntando al dominio/HTTPS, a `http://18.191.49.251:3000/**` y a `redup://**`.
 - [ ] `https://redup.app/.well-known/apple-app-site-association` y `assetlinks.json` publicados.
 - [ ] SMTP transaccional (Resend/SendGrid/Postmark) con SPF, DKIM y DMARC.
 - [ ] URL pública de privacidad y términos para App Store Connect y Play Console.

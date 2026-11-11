@@ -1,66 +1,92 @@
 # ==============================================================================
-# .dockerignore · Proyecto Expo / React Native (redup)
-# Optimizado para minimizar el contexto de compilación y evitar fugas de secretos
+# .dockerignore · Redup (Expo Router Web)
+# Reduce el contexto de build y evita filtrar secretos o artefactos nativos.
 # ==============================================================================
 
-# Dependencias locales (se reinstalan limpiamente en el contenedor)
+# ------------------------------------------------------------------------------
+# Dependencias locales (se reinstalan dentro de la imagen)
+# ------------------------------------------------------------------------------
 node_modules/
+.pnpm-store/
+.yarn/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-.pnpm-store/
 
-# Control de versiones (VCS)
+# ------------------------------------------------------------------------------
+# Control de versiones y CI
+# ------------------------------------------------------------------------------
 .git/
 .gitignore
 .gitattributes
 .github/
 
-# Salidas de compilación y bundles web/móvil
+# ------------------------------------------------------------------------------
+# Salidas de build y cachés
+# ------------------------------------------------------------------------------
 dist/
 build/
 web-build/
 .expo/
 .expo-shared/
+coverage/
+.nyc_output/
+*.lcov
+*.tsbuildinfo
+.metro-health-check*
 
-# Carpetas y artefactos nativos móviles (Continuous Native Generation / Gradle / Xcode)
+# ------------------------------------------------------------------------------
+# Carpetas nativas generadas (Expo CNG / Gradle / Xcode)
+# ------------------------------------------------------------------------------
 android/
 ios/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.apk
+*.aab
+*.ipa
+*.dmg
 
-# Variables de entorno y secretos sensibles (NUNCA incluir en la imagen)
+# ------------------------------------------------------------------------------
+# Variables de entorno y secretos (NUNCA dentro de la imagen)
+# El build recibe los valores mediante --build-arg.
+# ------------------------------------------------------------------------------
 .env
 .env.*
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-!.env.example
-!.env.production.example
+.env.*.local
+service-account*.json
+credentials*.json
+google-services.json
 
-# Supabase local y estado de CLI
+# ------------------------------------------------------------------------------
+# Supabase local (migraciones, funciones, estado del CLI)
+# ------------------------------------------------------------------------------
+supabase/
 .supabase/
-supabase/.branches/
-supabase/.temp/
-supabase/tests/
 
-# Herramientas de despliegue y CI/CD móvil
+# ------------------------------------------------------------------------------
+# Herramientas de despliegue móvil (no se usan en el build web)
+# ------------------------------------------------------------------------------
 eas.json
 .eas/
+scripts/
 
-# Cobertura y pruebas
-coverage/
-.nyc_output/
-*.lcov
-
-# Configuraciones de editores e IDEs
+# ------------------------------------------------------------------------------
+# Documentación y configuración de editores
+# ------------------------------------------------------------------------------
+README.md
+DEPLOYMENT.md
+AGENTS.md
+LICENSE
+opencode.json
 .vscode/
 .idea/
 *.sublime-project
@@ -68,7 +94,9 @@ coverage/
 *.swp
 *.swo
 
-# Archivos temporales y de sistema operativo
+# ------------------------------------------------------------------------------
+# Archivos temporales del sistema operativo
+# ------------------------------------------------------------------------------
 .DS_Store
 .DS_Store?
 ._*
@@ -76,9 +104,3 @@ coverage/
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Documentación del repositorio innecesaria en runtime
-README.md
-DEPLOYMENT.md
-LICENSE
-AGENTS.md
