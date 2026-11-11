@@ -3,7 +3,6 @@ import {
   Dimensions,
   Keyboard,
   LayoutAnimation,
-  Platform,
   ScrollView,
   TextInput,
   type NativeScrollEvent,
@@ -19,23 +18,36 @@ export function useKeyboardHeight(): number {
   const [height, setHeight] = useState(0);
 
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      const nextHeight = Math.max(0, e.endCoordinates?.height ?? 0);
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const onShow = (e: any) => {
+      const nextHeight = Math.max(0, e?.endCoordinates?.height ?? 0);
+      try {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      } catch {
+        // LayoutAnimation fallback en Android/Fabric
+      }
       setHeight(nextHeight);
-    });
+    };
 
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const onHide = () => {
+      try {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      } catch {
+        // LayoutAnimation fallback en Android/Fabric
+      }
       setHeight(0);
-    });
+    };
+
+    const subs = [
+      Keyboard.addListener('keyboardWillShow', onShow),
+      Keyboard.addListener('keyboardDidShow', onShow),
+      Keyboard.addListener('keyboardWillHide', onHide),
+      Keyboard.addListener('keyboardDidHide', onHide),
+    ];
 
     return () => {
-      showSub.remove();
-      hideSub.remove();
+      for (const sub of subs) {
+        sub.remove();
+      }
     };
   }, []);
 
@@ -86,20 +98,24 @@ export function useKeyboardAutoScroll() {
   }, []);
 
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      const nextHeight = Math.max(0, e.endCoordinates?.height ?? 0);
+    const onShow = (e: any) => {
+      const nextHeight = Math.max(0, e?.endCoordinates?.height ?? 0);
       keyboardHeightRef.current = nextHeight;
       setKeyboardHeight(nextHeight);
       setTimeout(() => scrollToFocusedInput(nextHeight), 50);
-    });
+    };
 
-    const hideSub = Keyboard.addListener(hideEvent, () => {
+    const onHide = () => {
       keyboardHeightRef.current = 0;
       setKeyboardHeight(0);
-    });
+    };
+
+    const subs = [
+      Keyboard.addListener('keyboardWillShow', onShow),
+      Keyboard.addListener('keyboardDidShow', onShow),
+      Keyboard.addListener('keyboardWillHide', onHide),
+      Keyboard.addListener('keyboardDidHide', onHide),
+    ];
 
     const onInputFocus = () => {
       setTimeout(() => scrollToFocusedInput(), 70);
@@ -108,8 +124,9 @@ export function useKeyboardAutoScroll() {
     focusListeners.add(onInputFocus);
 
     return () => {
-      showSub.remove();
-      hideSub.remove();
+      for (const sub of subs) {
+        sub.remove();
+      }
       focusListeners.delete(onInputFocus);
     };
   }, [scrollToFocusedInput]);

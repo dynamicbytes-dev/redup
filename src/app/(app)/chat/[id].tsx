@@ -10,6 +10,7 @@ import {
   Pressable,
   View,
 } from 'react-native';
+import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Composer } from '@/components/chat/composer';
@@ -40,7 +41,6 @@ import { setActiveConversationId } from '@/features/notifications/api';
 import { isMutedUntil, isSameMessageDay, mutePresetIso, relativeLastSeen } from '@/lib/format';
 import { queryKeys } from '@/lib/query-client';
 import type { ChatMessage } from '@/lib/types';
-import { useKeyboardHeight } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
 
 type Row =
@@ -53,7 +53,14 @@ export default function ChatScreen() {
 
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const keyboardHeight = useKeyboardHeight();
+  const keyboard = useAnimatedKeyboard({
+    isStatusBarTranslucentAndroid: true,
+    isNavigationBarTranslucentAndroid: true,
+  });
+
+  const animatedContainerStyle = useAnimatedStyle(() => ({
+    paddingBottom: Math.max(keyboard.height.value, insets.bottom),
+  }));
   const queryClient = useQueryClient();
   const { userId, profile, privacy, globalOnlineIds } = useSession();
 
@@ -443,7 +450,7 @@ export default function ChatScreen() {
         </View>
       </SafeAreaView>
 
-      <View style={{ flex: 1, paddingBottom: keyboardHeight }}>
+      <Animated.View style={[{ flex: 1 }, animatedContainerStyle]}>
         {messagesQuery.isLoading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={colors.primary} />
@@ -452,6 +459,7 @@ export default function ChatScreen() {
           <FlatList
             data={rows}
             inverted
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             keyExtractor={(item) => item.key}
             contentContainerStyle={{ paddingVertical: 12, flexGrow: 1 }}
@@ -548,9 +556,9 @@ export default function ChatScreen() {
           onSend={handleSend}
           onSendMedia={handleSendMedia}
           onTyping={notifyTyping}
-          bottomInset={keyboardHeight > 0 ? 6 : insets.bottom}
+          bottomInset={0}
         />
-      </View>
+      </Animated.View>
 
       <ActionSheet
         visible={Boolean(selected)}
