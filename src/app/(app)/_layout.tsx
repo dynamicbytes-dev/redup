@@ -45,6 +45,10 @@ export default function AppLayout() {
         <Stack.Screen name="contact/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="group/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen
+          name="server/[id]/channel/[channelId]"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
           name="call/[id]"
           options={{ presentation: 'fullScreenModal', animation: 'fade' }}
         />

@@ -65,6 +65,10 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(app)" />
         <Stack.Screen name="reset-password" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen
+          name="join/[code]"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
       </Stack>
     </>
   );

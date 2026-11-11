@@ -183,3 +183,77 @@ export type FriendRequestItem = {
   other: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_path' | 'about'>;
   direction: 'incoming' | 'outgoing';
 };
+
+// ------------------------------------------------------------
+// Servidores estilo Discord (Servers, Channels, Members, Messages)
+// ------------------------------------------------------------
+export type ServerRole = 'owner' | 'admin' | 'moderator' | 'member';
+export type ChannelType = 'text' | 'voice';
+
+export type Server = {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar_path: string | null;
+  owner_id: string;
+  invite_code: string;
+  created_at: string;
+  updated_at: string;
+  my_role?: ServerRole;
+  member_count?: number;
+};
+
+export type ServerMember = {
+  server_id: string;
+  user_id: string;
+  role: ServerRole;
+  nickname: string | null;
+  joined_at: string;
+  profile: Pick<
+    Profile,
+    'id' | 'username' | 'display_name' | 'avatar_path' | 'about' | 'last_seen_at' | 'show_online'
+  > | null;
+};
+
+export type ServerChannel = {
+  id: string;
+  server_id: string;
+  name: string;
+  topic: string | null;
+  type: ChannelType;
+  position: number;
+  created_at: string;
+};
+
+export type ServerChannelMessage = {
+  id: string;
+  channel_id: string;
+  server_id: string;
+  sender_id: string | null;
+  kind: MessageKind;
+  body: string | null;
+  media_path: string | null;
+  media_meta: Record<string, unknown> | null;
+  duration_ms: number | null;
+  reply_to_id: string | null;
+  created_at: string;
+  edited_at: string | null;
+  deleted_at: string | null;
+  sender_profile?: Pick<
+    Profile,
+    'id' | 'username' | 'display_name' | 'avatar_path' | 'about' | 'last_seen_at' | 'show_online'
+  > | null;
+  pending?: boolean;
+  failed?: boolean;
+};
+
+export type ServerPreview = {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar_path: string | null;
+  invite_code: string;
+  member_count: number;
+  owner_name: string;
+  already_member: boolean;
+};

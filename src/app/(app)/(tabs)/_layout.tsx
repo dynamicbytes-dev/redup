@@ -8,6 +8,7 @@ export default function TabsLayout() {
       screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
       tabBar={(props) => <RedupTabBar {...props} />}>
       <Tabs.Screen name="chats" options={{ title: 'Chats' }} />
+      <Tabs.Screen name="servers" options={{ title: 'Servidores' }} />
       <Tabs.Screen name="friends" options={{ title: 'Amigos' }} />
       <Tabs.Screen name="status" options={{ title: 'Estados' }} />
       <Tabs.Screen name="calls" options={{ title: 'Llamadas' }} />

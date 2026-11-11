@@ -29,3 +29,4 @@ end;
 $$;
 
 grant execute on function public.react_to_status(uuid, text) to authenticated;
+
