@@ -1,10 +1,10 @@
 # ==============================================================================
-# .dockerignore · Redup (Expo Router Web)
-# Reduce el contexto de build y evita filtrar secretos o artefactos nativos.
+# .dockerignore · Redup (Expo SDK 58 / Expo Router Web)
+# Reduce drásticamente el contexto de build y evita filtrar secretos o nativos.
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Dependencias locales (se reinstalan dentro de la imagen)
+# Dependencias y artefactos de gestores de paquetes locales
 # ------------------------------------------------------------------------------
 node_modules/
 .pnpm-store/
@@ -16,7 +16,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # ------------------------------------------------------------------------------
-# Control de versiones y CI
+# Control de versiones, configuración de CI y metadatos git
 # ------------------------------------------------------------------------------
 .git/
 .gitignore
@@ -24,7 +24,7 @@ lerna-debug.log*
 .github/
 
 # ------------------------------------------------------------------------------
-# Salidas de build y cachés
+# Salidas de compilación previas y cachés temporales
 # ------------------------------------------------------------------------------
 dist/
 build/
@@ -38,7 +38,8 @@ coverage/
 .metro-health-check*
 
 # ------------------------------------------------------------------------------
-# Carpetas nativas generadas (Expo CNG / Gradle / Xcode)
+# Carpetas nativas móviles y claves/certificados de firma
+# (El contenedor Docker es exclusivo para la versión web)
 # ------------------------------------------------------------------------------
 android/
 ios/
@@ -48,6 +49,9 @@ ios/
 *.p8
 *.p12
 *.key
+*.pem
+*.cert
+*.crt
 *.mobileprovision
 *.apk
 *.aab
@@ -55,8 +59,8 @@ ios/
 *.dmg
 
 # ------------------------------------------------------------------------------
-# Variables de entorno y secretos (NUNCA dentro de la imagen)
-# El build recibe los valores mediante --build-arg.
+# Secretos y variables de entorno (NUNCA dentro de la imagen)
+# Se pasan en tiempo de build o runtime según corresponda
 # ------------------------------------------------------------------------------
 .env
 .env.*
@@ -65,22 +69,33 @@ ios/
 service-account*.json
 credentials*.json
 google-services.json
+GoogleService-Info.plist
+fcm-service-account*.json
+*firebase*.json
+*livekit*.json
 
 # ------------------------------------------------------------------------------
-# Supabase local (migraciones, funciones, estado del CLI)
+# Supabase local (migraciones, funciones edge y estado CLI)
 # ------------------------------------------------------------------------------
 supabase/
 .supabase/
 
 # ------------------------------------------------------------------------------
-# Herramientas de despliegue móvil (no se usan en el build web)
+# Herramientas de despliegue móvil y scripts de testing local
 # ------------------------------------------------------------------------------
 eas.json
 .eas/
 scripts/
 
 # ------------------------------------------------------------------------------
-# Documentación y configuración de editores
+# Configuración de Docker y compose local
+# ------------------------------------------------------------------------------
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# ------------------------------------------------------------------------------
+# Documentación, licencias y configuración de editores
 # ------------------------------------------------------------------------------
 README.md
 DEPLOYMENT.md
@@ -95,7 +110,7 @@ opencode.json
 *.swo
 
 # ------------------------------------------------------------------------------
-# Archivos temporales del sistema operativo
+# Basura y metadatos de sistemas operativos (macOS / Windows / Linux)
 # ------------------------------------------------------------------------------
 .DS_Store
 .DS_Store?
