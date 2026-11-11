@@ -7,11 +7,19 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   View,
 } from 'react-native';
-import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedKeyboard,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Composer } from '@/components/chat/composer';
@@ -65,9 +73,48 @@ export default function ChatScreen() {
     isNavigationBarTranslucentAndroid: true,
   });
 
-  const animatedContainerStyle = useAnimatedStyle(() => ({
-    paddingBottom: Math.max(keyboard.height.value, insets.bottom),
-  }));
+  // Fallback nativo: en Android con barra de 3 botones o configuraciones edge-to-edge donde
+  // useAnimatedKeyboard puede retornar 0, Keyboard.addListener recibe siempre la altura real del teclado.
+  const fallbackKeyboardHeight = useSharedValue(0);
+
+  useEffect(() => {
+    const onShow = (e: any) => {
+      const h = Math.max(0, e?.endCoordinates?.height ?? 0);
+      const duration = Platform.OS === 'ios' ? (e?.duration ?? 250) : 180;
+      fallbackKeyboardHeight.value = withTiming(h, {
+        duration,
+        easing: Easing.out(Easing.ease),
+      });
+    };
+
+    const onHide = (e: any) => {
+      const duration = Platform.OS === 'ios' ? (e?.duration ?? 250) : 180;
+      fallbackKeyboardHeight.value = withTiming(0, {
+        duration,
+        easing: Easing.out(Easing.ease),
+      });
+    };
+
+    const subs = [
+      Keyboard.addListener('keyboardWillShow', onShow),
+      Keyboard.addListener('keyboardDidShow', onShow),
+      Keyboard.addListener('keyboardWillHide', onHide),
+      Keyboard.addListener('keyboardDidHide', onHide),
+    ];
+
+    return () => {
+      for (const sub of subs) sub.remove();
+    };
+  }, [fallbackKeyboardHeight]);
+
+  const animatedContainerStyle = useAnimatedStyle(() => {
+    const reanimatedHeight = Math.max(0, keyboard.height.value);
+    const nativeHeight = Math.max(0, fallbackKeyboardHeight.value);
+    const activeKeyboard = Math.max(reanimatedHeight, nativeHeight);
+    return {
+      paddingBottom: Math.max(activeKeyboard, insets.bottom),
+    };
+  });
   const queryClient = useQueryClient();
   const { userId, profile, privacy, globalOnlineIds } = useSession();
 

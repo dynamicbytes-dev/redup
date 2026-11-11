@@ -204,8 +204,11 @@ export async function updatePassword(password: string): Promise<void> {
   const problem = validatePasswordStrict(password, true);
   if (problem) throw new AppError(problem);
 
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) throw new AppError('No pudimos cambiar la contraseña.');
+  const { data, error } = await supabase.auth.updateUser({ password });
+  if (data?.user) return;
+  if (error) {
+    throw new AppError(error.message || 'No pudimos cambiar la contraseña.');
+  }
 }
 
 export async function signOut(): Promise<void> {

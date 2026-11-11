@@ -1,4 +1,4 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, useSegments } from 'expo-router';
 
 import { useSession } from '@/features/auth/session';
 
@@ -8,9 +8,12 @@ export const unstable_settings = {
 
 export default function AuthLayout() {
   const { session, loading } = useSession();
+  const segments = useSegments();
+  const isForgotPassword = segments.includes('forgot-password');
 
   if (loading) return null;
-  if (session) return <Redirect href="/chats" />;
+  // Si el usuario está en el flujo de recuperación de contraseña, no lo expulsamos a chats
+  if (session && !isForgotPassword) return <Redirect href="/chats" />;
 
   return (
     <Stack

@@ -49,7 +49,14 @@ export default function ResetPasswordScreen() {
           throw new Error(params.error_description ?? 'El enlace ya no es válido.');
         }
 
-        // 1. Si viene el code de PKCE
+        // 1. Si ya existe una sesión activa (ej. acaba de verificar el OTP en pantalla anterior o token previo)
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          if (!cancelled) setStatus('ready');
+          return;
+        }
+
+        // 2. Si viene el code de PKCE
         if (params.code) {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(params.code);
           if (exchangeError) throw exchangeError;
@@ -57,7 +64,7 @@ export default function ResetPasswordScreen() {
           return;
         }
 
-        // 2. Si viene el token_hash
+        // 3. Si viene el token_hash
         if (params.token_hash) {
           const { error: otpError } = await supabase.auth.verifyOtp({
             token_hash: params.token_hash,
@@ -68,7 +75,7 @@ export default function ResetPasswordScreen() {
           return;
         }
 
-        // 3. Si viene por query params access_token y refresh_token
+        // 4. Si viene por query params access_token y refresh_token
         if (params.access_token && params.refresh_token) {
           const { error: sessionError } = await supabase.auth.setSession({
             access_token: params.access_token,
@@ -79,7 +86,7 @@ export default function ResetPasswordScreen() {
           return;
         }
 
-        // 4. Revisar si la URL inicial trae fragmentos hash (#access_token=...&refresh_token=...)
+        // 5. Revisar si la URL inicial trae fragmentos hash (#access_token=...&refresh_token=...)
         const initialUrl = await Linking.getInitialURL();
         if (initialUrl && initialUrl.includes('#')) {
           const hashPart = initialUrl.split('#')[1];
@@ -98,19 +105,18 @@ export default function ResetPasswordScreen() {
           }
         }
 
-        // 5. Verificar si ya existe una sesión activa de recovery
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          if (!cancelled) setStatus('ready');
-          return;
-        }
-
         // Si no hay sesión ni params válidos, ofrecer ingreso manual de OTP
         if (!cancelled) {
           setStatus('manual_otp');
         }
       } catch (e) {
         if (cancelled) return;
+        // Si falló el canje pero ya hay una sesión establecida, permitir continuar
+        const { data: checkData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+        if (checkData?.session) {
+          setStatus('ready');
+          return;
+        }
         setStatus('manual_otp');
         setError(
           e instanceof Error
