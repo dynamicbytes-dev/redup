@@ -51,18 +51,19 @@ El proyecto cuenta con [`eas.json`](file:///Users/rosangeles/Documents/redup/eas
 5. **Notificaciones Push Remotas (FCM y APNs)**:
    - Al ejecutar `eas build`, EAS te guiará para subir tu clave `.p8` de Apple Developer (APNs) y el archivo `google-services.json` vinculado al proyecto de Firebase Cloud Messaging (FCM).
 
-### Servidor web de producción (Docker)
+### Servidor web de producción (Docker + Nginx)
 
-La versión web se publica en la EC2 con IP pública **`18.191.49.251`**, servida por
-el `Dockerfile` en el puerto **3000**:
+La versión web se publica en la EC2 con IP pública **`18.191.49.251`**.
+El contenedor Docker escucha **solo en `127.0.0.1:3000`** y Nginx publica en el
+puerto **80**.
+
+#### 1. Build de la imagen
 
 ```bash
 docker build \
   --build-arg EXPO_PUBLIC_SUPABASE_URL=https://cctpntjrlduntjjpjpcb.supabase.co \
   --build-arg EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon_key_de_produccion> \
-  -t redup-web .
-
-docker run -d --name redup-web --restart unless-stopped -p 3000:3000 redup-web
+  -t redup-web:latest .
 ```
 
 - El `Dockerfile` usa **Node 22** (requerido por Expo SDK 58) y un build multi-stage:
@@ -78,18 +79,75 @@ docker run -d --name redup-web --restart unless-stopped -p 3000:3000 redup-web
     --build-arg EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon_key_de_produccion> \
     -t redup-web --load .
   ```
-- Verifica el contenedor con `docker ps` (debe mostrar `0.0.0.0:3000->3000/tcp`),
-  `docker logs -f redup-web` y `curl -I http://127.0.0.1:3000`.
-- Si pones Nginx/Caddy delante en 80/443, publica el contenedor solo en localhost
-  (`-p 127.0.0.1:3000:3000`) y **cierra el puerto 3000 en el Security Group**.
-- URL pública: `http://18.191.49.251:3000`
+
+#### 2. Contenedor accesible solo por localhost
+
+```bash
+docker run -d \
+  --name redup-container \
+  --restart always \
+  -p 127.0.0.1:3000:3000 \
+  redup-web:latest
+```
+
+Verifica:
+
+```bash
+docker ps
+docker logs -f redup-container
+curl -I http://127.0.0.1:3000
+```
+
+#### 3. Nginx como reverse proxy en el puerto 80
+
+```bash
+sudo apt-get update
+sudo apt-get install -y nginx
+```
+
+Crea `/etc/nginx/sites-available/redup`:
+
+```nginx
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    client_max_body_size 25m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+}
+```
+
+Actívalo:
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/redup /etc/nginx/sites-enabled/redup
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl enable --now nginx
+```
+
+- URL pública: `http://18.191.49.251`
+- Security Group: solo `22`, `80` y `443`. El puerto `3000` queda cerrado.
 - En **Supabase Dashboard → Authentication → URL Configuration** agrega como
   *Redirect URLs*:
-  - `http://18.191.49.251:3000/**`
-  - `http://18.191.49.251:3000/reset-password`
-- Asegúrate de que el Security Group de AWS permita el puerto `3000` (TCP) y, si
-  publicas el dominio `redup.app`, coloca Nginx/Caddy delante para servir HTTPS y
-  los archivos `.well-known` de los deep links.
+  - `http://18.191.49.251/**`
+  - `http://18.191.49.251/reset-password`
+- Para HTTPS, apunta un dominio (por ejemplo `redup.app`) a `18.191.49.251`
+  y ejecuta Certbot; después actualiza las Redirect URLs a `https://`. El dominio
+  `redup.app` todavía no resuelve en DNS.
 
 ---
 
@@ -276,8 +334,8 @@ El proyecto incluye el flujo automatizado [`.github/workflows/ci.yml`](file:///U
 - [ ] Credenciales APNs/FCM cargadas en EAS y push probado en dispositivo físico.
 - [ ] Proyecto Supabase de producción enlazado y migraciones `000000`–`000016` aplicadas.
 - [ ] `EXPO_PUBLIC_SUPABASE_URL=https://cctpntjrlduntjjpjpcb.supabase.co` y la anon key del proyecto definidos en EAS y en el build de Docker.
-- [ ] Build web desplegado en `http://18.191.49.251:3000` y puerto `3000` abierto en el Security Group.
-- [ ] `site_url` y Redirect URLs de Supabase apuntando al dominio/HTTPS, a `http://18.191.49.251:3000/**` y a `redup://**`.
+- [ ] Build web desplegado en `http://18.191.49.251` con Nginx en el puerto 80 y el contenedor en `127.0.0.1:3000`; Security Group con solo `22`, `80` y `443`.
+- [ ] `site_url` y Redirect URLs de Supabase apuntando al dominio/HTTPS, a `http://18.191.49.251/**`, a `http://18.191.49.251/reset-password` y a `redup://**`.
 - [ ] `https://redup.app/.well-known/apple-app-site-association` y `assetlinks.json` publicados.
 - [ ] SMTP transaccional (Resend/SendGrid/Postmark) con SPF, DKIM y DMARC.
 - [ ] URL pública de privacidad y términos para App Store Connect y Play Console.

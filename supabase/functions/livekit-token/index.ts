@@ -9,7 +9,10 @@
 // 4. Previene suplantación de identidad: El nombre del participante se lee del perfil verificado.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { securityResponse } from '../_shared/security-headers.ts';
+import {
+  corsPreflightResponse,
+  securityResponse,
+} from '../_shared/security-headers.ts';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -47,6 +50,10 @@ async function signLiveKitJwt(
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return corsPreflightResponse();
+  }
+
   if (req.method !== 'POST') {
     return securityResponse({ error: 'method_not_allowed' }, { status: 405 });
   }

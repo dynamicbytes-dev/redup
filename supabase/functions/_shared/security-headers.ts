@@ -9,7 +9,22 @@ export const SECURITY_HEADERS: Record<string, string> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
   'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  // CORS: la app web se sirve desde otro origen (Nginx) y llama a las
+  // Edge Functions en *.supabase.co. Sin estas cabeceras el navegador
+  // bloquea el preflight y el login falla solo en web.
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-api-version, apikey, content-type, x-webhook-secret, cf-turnstile-response',
+  'Access-Control-Max-Age': '86400',
 };
+
+export function corsPreflightResponse(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: SECURITY_HEADERS,
+  });
+}
 
 export function securityResponse(
   body: unknown,

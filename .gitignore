@@ -37,6 +37,8 @@ yarn-error.*
 !.env.production.example
 *.keystore
 service-account*.json
+fcm-service-account.json
+*firebase-adminsdk*.json
 credentials*.json
 google-services.json
 # generated native folders

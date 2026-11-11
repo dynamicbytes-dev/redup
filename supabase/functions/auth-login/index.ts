@@ -9,7 +9,10 @@
 //    renderice el widget y envíe turnstileToken.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { securityResponse } from '../_shared/security-headers.ts';
+import {
+  corsPreflightResponse,
+  securityResponse,
+} from '../_shared/security-headers.ts';
 
 type LoginBody = {
   identifier?: string;
@@ -18,6 +21,10 @@ type LoginBody = {
 };
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return corsPreflightResponse();
+  }
+
   if (req.method !== 'POST') {
     return securityResponse({ error: 'method_not_allowed' }, { status: 405 });
   }

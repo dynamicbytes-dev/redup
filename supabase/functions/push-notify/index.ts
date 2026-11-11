@@ -7,7 +7,10 @@
 // 4. Respeta bloqueos entre usuarios y conversaciones silenciadas.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { securityResponse } from '../_shared/security-headers.ts';
+import {
+  corsPreflightResponse,
+  securityResponse,
+} from '../_shared/security-headers.ts';
 
 type PushNotifyRequestBody = {
   // Soporta formato Database Webhook ({ record: { id } }) o llamada de API ({ messageId })
@@ -25,6 +28,10 @@ function formatMessagePreview(kind: string, body: string | null): string {
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return corsPreflightResponse();
+  }
+
   if (req.method !== 'POST') {
     return securityResponse({ error: 'method_not_allowed' }, { status: 405 });
   }
