@@ -342,3 +342,4 @@ drop trigger if exists trg_on_wall_post_deleted_clean_storage on public.wall_pos
 create trigger trg_on_wall_post_deleted_clean_storage
   after delete on public.wall_posts
   for each row execute function public.on_wall_post_deleted_clean_storage();
+
