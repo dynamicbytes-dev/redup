@@ -40,6 +40,7 @@ import {
   useStatusesRealtime,
 } from '@/features/status/hooks';
 import { formatListTime, formatMessageTime } from '@/lib/format';
+import { saveImageToGallery } from '@/lib/save-media';
 import type { StatusAuthorGroup, StatusItem } from '@/lib/types';
 import { useKeyboardHeight } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
@@ -1088,6 +1089,23 @@ function StatusViewerModal({
                 {formatMessageTime(current.created_at)}
               </AppText>
             </View>
+
+            {current.kind === 'image' && imageUri ? (
+              <Pressable
+                onPress={async () => {
+                  setPaused(true);
+                  try {
+                    const res = await saveImageToGallery(imageUri);
+                    showToast(res.message);
+                  } finally {
+                    setPaused(false);
+                  }
+                }}
+                hitSlop={10}
+                style={{ padding: 6 }}>
+                <Icon name="download-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+            ) : null}
 
             {isMine ? (
               <Pressable onPress={confirmDelete} hitSlop={10} style={{ padding: 6 }}>

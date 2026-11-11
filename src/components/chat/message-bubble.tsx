@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { Avatar } from '@/components/ui/avatar';
@@ -15,6 +15,7 @@ import {
   formatMessageTime,
   messagePreview,
 } from '@/lib/format';
+import { saveDocumentToDevice } from '@/lib/save-media';
 import { useSignedMediaUrl } from '@/lib/storage';
 import type { ChatMessage, Message, StoryReplyMeta } from '@/lib/types';
 import { useTheme } from '@/theme';
@@ -469,26 +470,37 @@ function FileBubbleContent({
 }) {
   const { colors } = useTheme();
   const url = useSignedMediaUrl(message.media_path);
+  const [downloading, setDownloading] = useState(false);
 
   const meta = message.media_meta ?? {};
   const fileName = typeof meta.name === 'string' && meta.name ? meta.name : 'Documento adjunto';
   const fileSize = typeof meta.size === 'number' ? formatFileSize(meta.size) : '';
   const ext = (fileName.split('.').pop() ?? 'ARCHIVO').toUpperCase().slice(0, 5);
 
-  async function openDocument() {
-    if (!url) return;
+  async function handleDownloadOrOpen() {
+    if (!url || downloading) return;
+    setDownloading(true);
     try {
-      await WebBrowser.openBrowserAsync(url);
+      const mime = typeof meta.mime_type === 'string' ? meta.mime_type : undefined;
+      const result = await saveDocumentToDevice(url, fileName, mime);
+      if (!result.success) {
+        // Fallback a navegador si no pudo guardarse directamente
+        await WebBrowser.openBrowserAsync(url).catch(() => {
+          Linking.openURL(url).catch(() => {});
+        });
+      }
     } catch {
-      Linking.openURL(url).catch(() => {});
+      Alert.alert('Error', 'No se pudo descargar el archivo.');
+    } finally {
+      setDownloading(false);
     }
   }
 
   return (
     <View style={{ gap: 6, minWidth: 210 }}>
       <Pressable
-        onPress={openDocument}
-        disabled={!url}
+        onPress={handleDownloadOrOpen}
+        disabled={!url || downloading}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -523,15 +535,19 @@ function FileBubbleContent({
           <AppText
             variant="micro"
             style={{ color: isMine ? 'rgba(255,255,255,0.75)' : colors.textMuted }}>
-            {fileSize ? `${ext} · ${fileSize}` : ext}
+            {downloading ? 'Descargando…' : fileSize ? `${ext} · ${fileSize}` : ext}
           </AppText>
         </View>
 
-        <Icon
-          name="download-outline"
-          size={19}
-          color={isMine ? '#FFFFFF' : colors.primary}
-        />
+        {downloading ? (
+          <ActivityIndicator size="small" color={isMine ? '#FFFFFF' : colors.primary} />
+        ) : (
+          <Icon
+            name="download-outline"
+            size={19}
+            color={isMine ? '#FFFFFF' : colors.primary}
+          />
+        )}
       </Pressable>
 
       {message.body ? (

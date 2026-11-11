@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -40,6 +41,12 @@ import { useChatRealtime } from '@/features/chats/realtime';
 import { setActiveConversationId } from '@/features/notifications/api';
 import { isMutedUntil, isSameMessageDay, mutePresetIso, relativeLastSeen } from '@/lib/format';
 import { queryKeys } from '@/lib/query-client';
+import {
+  saveDocumentToDevice,
+  saveImageToGallery,
+  shareLocalOrRemoteMedia,
+} from '@/lib/save-media';
+import { signedMediaUrl } from '@/lib/storage';
 import type { ChatMessage } from '@/lib/types';
 import { useTheme } from '@/theme';
 
@@ -90,7 +97,26 @@ export default function ChatScreen() {
     uri: string;
     caption?: string | null;
   } | null>(null);
+  const [savingLightboxImage, setSavingLightboxImage] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+
+  async function handleSaveLightboxImage() {
+    if (!lightboxImage || savingLightboxImage) return;
+    setSavingLightboxImage(true);
+    try {
+      const res = await saveImageToGallery(lightboxImage.uri);
+      Alert.alert(res.success ? 'Listo' : 'Aviso', res.message);
+    } catch {
+      Alert.alert('Error', 'No pudimos guardar la imagen.');
+    } finally {
+      setSavingLightboxImage(false);
+    }
+  }
+
+  async function handleShareLightboxImage() {
+    if (!lightboxImage) return;
+    await shareLocalOrRemoteMedia(lightboxImage.uri);
+  }
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
@@ -241,6 +267,56 @@ export default function ChatScreen() {
       },
     });
   }
+  if (selected && selected.kind === 'image' && selected.media_path && !selected.deleted_at) {
+    sheetOptions.push({
+      label: 'Guardar en la galería',
+      icon: 'download-outline',
+      onPress: async () => {
+        const url = await signedMediaUrl(selected.media_path);
+        if (url) {
+          const res = await saveImageToGallery(url);
+          Alert.alert(res.success ? 'Listo' : 'Aviso', res.message);
+        }
+      },
+    });
+    sheetOptions.push({
+      label: 'Compartir imagen',
+      icon: 'share-social-outline',
+      onPress: async () => {
+        const url = await signedMediaUrl(selected.media_path);
+        if (url) await shareLocalOrRemoteMedia(url);
+      },
+    });
+  }
+
+  if (selected && selected.kind === 'file' && selected.media_path && !selected.deleted_at) {
+    sheetOptions.push({
+      label: 'Guardar archivo en el dispositivo',
+      icon: 'download-outline',
+      onPress: async () => {
+        const url = await signedMediaUrl(selected.media_path);
+        const meta = (selected.media_meta ?? {}) as Record<string, unknown>;
+        const name = typeof meta.name === 'string' ? meta.name : 'archivo';
+        const mime = typeof meta.mime_type === 'string' ? meta.mime_type : undefined;
+        if (url) {
+          const res = await saveDocumentToDevice(url, name, mime);
+          if (!res.success) Alert.alert('Aviso', res.message);
+        }
+      },
+    });
+    sheetOptions.push({
+      label: 'Compartir archivo',
+      icon: 'share-social-outline',
+      onPress: async () => {
+        const url = await signedMediaUrl(selected.media_path);
+        const meta = (selected.media_meta ?? {}) as Record<string, unknown>;
+        const name = typeof meta.name === 'string' ? meta.name : 'archivo';
+        const mime = typeof meta.mime_type === 'string' ? meta.mime_type : undefined;
+        if (url) await shareLocalOrRemoteMedia(url, name, mime);
+      },
+    });
+  }
+
   if (selected && selected.kind !== 'system' && selected.sender_id === userId && !selected.deleted_at) {
     sheetOptions.push({
       label: 'Eliminar mensaje',
@@ -589,9 +665,44 @@ export default function ChatScreen() {
               style={{
                 flexDirection: 'row',
                 justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: 12,
                 paddingHorizontal: 16,
                 paddingVertical: 10,
               }}>
+              <Pressable
+                onPress={handleShareLightboxImage}
+                hitSlop={10}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: 'rgba(255,255,255,0.14)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Icon name="share-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+
+              <Pressable
+                onPress={handleSaveLightboxImage}
+                disabled={savingLightboxImage}
+                hitSlop={10}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: 'rgba(255,255,255,0.14)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                {savingLightboxImage ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Icon name="download-outline" size={22} color="#FFFFFF" />
+                )}
+              </Pressable>
+
               <Pressable
                 onPress={() => setLightboxImage(null)}
                 hitSlop={10}

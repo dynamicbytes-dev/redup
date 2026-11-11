@@ -92,7 +92,15 @@
       "./plugins/with-android-sdk",
       "expo-secure-store",
       "expo-asset",
-      "@livekit/react-native-expo-plugin"
+      "@livekit/react-native-expo-plugin",
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Redup necesita acceso a tus fotos para guardar imágenes en tu galería.",
+          "savePhotosPermission": "Redup necesita permiso para guardar imágenes en tu galería."
+        }
+      ]
     ],
     "experiments": {
       "reactCompiler": true
