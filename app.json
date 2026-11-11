@@ -90,15 +90,6 @@
       "./plugins/with-android-sdk",
       "expo-secure-store",
       "expo-asset",
-      "@sentry/react-native",
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "project": "react-native",
-          "organization": "dynamicbytes-dev"
-        }
-      ]
     ],
     "experiments": {
       "reactCompiler": true
