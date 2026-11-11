@@ -91,9 +91,9 @@ export default function WallScreen() {
     setPublishing(true);
     try {
       let uploadedPath: string | null = null;
-      if (postMedia) {
+      if (postMedia && userId) {
         const uploadRes = await uploadChatMedia({
-          conversationId: 'wall',
+          conversationId: `wall/${userId}`,
           messageId: crypto.randomUUID(),
           media: {
             kind: 'image',

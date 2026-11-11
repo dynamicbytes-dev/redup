@@ -151,7 +151,7 @@ export default function ServerChannelScreen() {
       setSending(true);
       const messageId = crypto.randomUUID();
       const uploaded = await uploadChatMedia({
-        conversationId: `server-${serverId}`,
+        conversationId: `servers/${serverId}`,
         messageId,
         media: picked,
       });
