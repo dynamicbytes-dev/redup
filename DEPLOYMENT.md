@@ -24,10 +24,8 @@ El proyecto cuenta con [`eas.json`](file:///Users/rosangeles/Documents/redup/eas
    ```bash
    eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://tu-proyecto.supabase.co" --environment production --visibility plaintext
    eas env:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "tu_anon_key_de_produccion" --environment production --visibility sensitive
-   eas env:create --name EXPO_PUBLIC_SENTRY_DSN --value "https://...@sentry.io/..." --environment production --visibility plaintext
    ```
    `eas secret:create` sigue funcionando pero está en modo legado; usa `eas env:create`.
-   Para source maps de Sentry, configura también `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` y `SENTRY_PROJECT`.
 
 4. Compilar el APK o bundle de producción:
    ```bash
@@ -206,10 +204,8 @@ Para evitar que otras apps instaladas secuestren enlaces y sesiones mediante el 
      ```bash
      npx eas update --channel production --message "Parche de seguridad crítico"
      ```
-2. **Monitoreo de Errores (Sentry)**:
-   - `@sentry/react-native` y `expo-updates` ya están instalados; `src/lib/error-reporting.ts` inicializa Sentry si existe `EXPO_PUBLIC_SENTRY_DSN`.
-   - Configura `EXPO_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` y `SENTRY_PROJECT` en EAS para subir source maps.
-   - Recomendado: envolver el árbol raíz con `Sentry.wrap` para capturar errores de render y trazas de navegación.
+2. **Monitoreo y Diagnóstico**:
+   - `src/lib/error-reporting.ts` centraliza el reporte de excepciones de la app de forma segura en modo local sin requerir SDKs pesados.
 
 ---
 
@@ -228,7 +224,7 @@ El proyecto incluye el flujo automatizado [`.github/workflows/ci.yml`](file:///U
 - [ ] `extra.eas.projectId` completo y `submit.production` configurado (`ascAppId`, `appleTeamId`, service account de Google).
 - [ ] Credenciales APNs/FCM cargadas en EAS y push probado en dispositivo físico.
 - [ ] Proyecto Supabase de producción enlazado y migraciones `000000`–`000016` aplicadas.
-- [ ] `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` y `EXPO_PUBLIC_SENTRY_DSN` definidos en EAS.
+- [ ] `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY` definidos en EAS.
 - [ ] `site_url` y Redirect URLs de Supabase apuntando al dominio/HTTPS y a `redup://**`.
 - [ ] `https://redup.app/.well-known/apple-app-site-association` y `assetlinks.json` publicados.
 - [ ] SMTP transaccional (Resend/SendGrid/Postmark) con SPF, DKIM y DMARC.
