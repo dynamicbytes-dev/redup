@@ -16,6 +16,7 @@ type TabConfig = {
 
 const TABS: Record<string, TabConfig> = {
   chats: { label: 'Chats', icon: 'chatbubbles-outline', activeIcon: 'chatbubbles' },
+  wall: { label: 'Muro', icon: 'newspaper-outline', activeIcon: 'newspaper' },
   servers: { label: 'Servidores', icon: 'grid-outline', activeIcon: 'grid' },
   friends: { label: 'Amigos', icon: 'people-outline', activeIcon: 'people' },
   status: { label: 'Estados', icon: 'aperture-outline', activeIcon: 'aperture' },

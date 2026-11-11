@@ -257,3 +257,38 @@ export type ServerPreview = {
   owner_name: string;
   already_member: boolean;
 };
+
+// ------------------------------------------------------------
+// Muro estilo X (Twitter) para Amigos
+// ------------------------------------------------------------
+export type WallPost = {
+  id: string;
+  author_id: string;
+  content: string;
+  media_path: string | null;
+  created_at: string;
+  author: Pick<
+    Profile,
+    'id' | 'username' | 'display_name' | 'avatar_path' | 'about' | 'last_seen_at'
+  >;
+  is_friend: boolean;
+  likes_count: number;
+  comments_count: number;
+  my_reaction: string | null;
+};
+
+export type WallComment = {
+  id: string;
+  post_id: string;
+  author_id: string;
+  parent_comment_id: string | null;
+  content: string;
+  created_at: string;
+  author: Pick<
+    Profile,
+    'id' | 'username' | 'display_name' | 'avatar_path' | 'about'
+  >;
+  is_friend: boolean;
+  likes_count: number;
+  my_reaction: string | null;
+};
