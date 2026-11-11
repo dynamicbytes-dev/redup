@@ -92,6 +92,7 @@
       "./plugins/with-android-sdk",
       "expo-secure-store",
       "expo-asset",
+      "@livekit/react-native-expo-plugin"
     ],
     "experiments": {
       "reactCompiler": true

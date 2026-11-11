@@ -186,7 +186,7 @@ export async function requestLiveKitCredentials(input: {
   }
 
   return {
-    configured: Boolean(envUrl),
+    configured: false,
     url: envUrl,
     token: null,
     roomName: input.roomName,

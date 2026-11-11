@@ -63,9 +63,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Export oficial de Expo Router. Genera la SPA estática en /app/dist.
-# Si en el futuro se usa LiveKit en el cliente, añadir aquí:
-#   ARG EXPO_PUBLIC_LIVEKIT_URL
-#   ENV EXPO_PUBLIC_LIVEKIT_URL=$EXPO_PUBLIC_LIVEKIT_URL
+# LiveKit URL para llamadas WebRTC en cliente
+ARG EXPO_PUBLIC_LIVEKIT_URL
+ENV EXPO_PUBLIC_LIVEKIT_URL=$EXPO_PUBLIC_LIVEKIT_URL
+
 RUN npx expo export --platform web --output-dir dist
 
 # ------------------------------------------------------------------------------

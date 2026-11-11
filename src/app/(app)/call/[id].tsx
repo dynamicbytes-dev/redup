@@ -1,7 +1,17 @@
+import {
+  AudioSession,
+  isTrackReference,
+  LiveKitRoom,
+  useLocalParticipant,
+  useTracks,
+  VideoTrack,
+  type TrackReferenceOrPlaceholder,
+} from '@livekit/react-native';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Track } from 'livekit-client';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
@@ -53,6 +63,16 @@ export default function ActiveCallScreen() {
 
   const isVideo = videoEnabled ?? call?.kind === 'video';
   const effectivePhase = call?.status === 'ongoing' && phase === 'ringing' ? 'ongoing' : phase;
+
+  // Gestión de sesión de audio nativa con LiveKit
+  useEffect(() => {
+    if (Platform.OS !== 'web' && effectivePhase === 'ongoing') {
+      AudioSession.startAudioSession().catch(() => {});
+      return () => {
+        AudioSession.stopAudioSession().catch(() => {});
+      };
+    }
+  }, [effectivePhase]);
 
   // Solicitar token de LiveKit al abrir la sala
   useEffect(() => {
@@ -336,7 +356,7 @@ export default function ActiveCallScreen() {
         )}
       </View>
 
-      {/* Escenario central (voz o vídeo) */}
+      {/* Escenario central (LiveKit SFU o Tiempo Real) */}
       <View
         style={{
           flex: 1,
@@ -344,151 +364,46 @@ export default function ActiveCallScreen() {
           justifyContent: 'center',
           paddingHorizontal: 24,
         }}>
-        {remoteShowsVideo && effectivePhase === 'ongoing' ? (
-          <View
-            style={{
-              width: '100%',
-              flex: 1,
-              marginVertical: 20,
-              borderRadius: 28,
-              backgroundColor: '#151326',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.1)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
+        {livekitInfo?.token && livekitInfo?.url ? (
+          <LiveKitRoom
+            serverUrl={livekitInfo.url}
+            token={livekitInfo.token}
+            connect={effectivePhase === 'ongoing'}
+            audio={!micMuted}
+            video={Boolean(isVideo)}
+            options={{
+              adaptiveStream: { pixelDensity: 'screen' },
             }}>
-            <Avatar name={targetTitle} uri={targetAvatar} size={116} />
-            <AppText
-              variant="subtitle"
-              color="#FFFFFF"
-              style={{ marginTop: 16, fontSize: 22 }}>
-              {targetTitle}
-            </AppText>
-            <AppText
-              variant="caption"
-              color="rgba(255,255,255,0.65)"
-              style={{ marginTop: 4 }}>
-              {statusSubtitle} · Vídeo HD activo
-            </AppText>
-
-            {remoteMuted ? (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  marginTop: 12,
-                  paddingHorizontal: 12,
-                  paddingVertical: 5,
-                  borderRadius: 999,
-                  backgroundColor: 'rgba(229, 72, 77, 0.25)',
-                }}>
-                <Icon name="mic-off" size={14} color={CALL_COLORS.rose400} />
-                <AppText variant="micro" color="#FFFFFF">
-                  Micrófono silenciado
-                </AppText>
-              </View>
-            ) : null}
-
-            {/* Vista previa local Picture-in-Picture */}
-            <View
-              style={{
-                position: 'absolute',
-                right: 16,
-                bottom: 16,
-                width: 108,
-                height: 148,
-                borderRadius: 18,
-                backgroundColor: '#221F38',
-                borderWidth: 1.5,
-                borderColor: CALL_COLORS.indigo400,
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 8,
-              }}>
-              <Avatar
-                name={profile?.display_name ?? 'Tú'}
-                uri={profile?.avatar_path}
-                size={48}
+            <View style={{ width: '100%', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <LiveKitConnectedStage
+                isVideo={Boolean(isVideo)}
+                effectivePhase={effectivePhase}
+                remoteShowsVideo={Boolean(remoteShowsVideo)}
+                remoteMuted={remoteMuted}
+                micMuted={micMuted}
+                frontCamera={frontCamera}
+                targetTitle={targetTitle}
+                targetAvatar={targetAvatar}
+                statusSubtitle={statusSubtitle}
+                profile={profile}
               />
-              <AppText
-                variant="micro"
-                color="#FFFFFF"
-                style={{ marginTop: 8, fontWeight: '600' }}>
-                Tú ({frontCamera ? 'Frontal' : 'Trasera'})
-              </AppText>
-              {micMuted ? (
-                <Icon
-                  name="mic-off"
-                  size={13}
-                  color={CALL_COLORS.rose400}
-                  style={{ marginTop: 4 }}
-                />
-              ) : null}
             </View>
-          </View>
+          </LiveKitRoom>
         ) : (
-          <View style={{ alignItems: 'center' }}>
-            <View
-              style={{
-                width: 164,
-                height: 164,
-                borderRadius: 82,
-                backgroundColor: 'rgba(91, 75, 232, 0.14)',
-                borderWidth: 1,
-                borderColor: 'rgba(124, 110, 242, 0.35)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <View
-                style={{
-                  width: 136,
-                  height: 136,
-                  borderRadius: 68,
-                  backgroundColor: 'rgba(91, 75, 232, 0.24)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <Avatar name={targetTitle} uri={targetAvatar} size={112} />
-              </View>
-            </View>
-
-            <AppText
-              variant="title"
-              color="#FFFFFF"
-              style={{ marginTop: 22, textAlign: 'center' }}>
-              {targetTitle}
-            </AppText>
-
-            <AppText
-              variant="body"
-              color="rgba(255,255,255,0.7)"
-              style={{ marginTop: 6 }}>
-              {statusSubtitle}
-            </AppText>
-
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                marginTop: 14,
-                paddingHorizontal: 12,
-                paddingVertical: 5,
-                borderRadius: 999,
-                backgroundColor: 'rgba(255,255,255,0.07)',
-              }}>
-              <Icon
-                name={isVideo ? 'videocam-outline' : 'call-outline'}
-                size={14}
-                color={CALL_COLORS.indigo400}
-              />
-              <AppText variant="micro" color="rgba(255,255,255,0.75)">
-                {isVideo ? 'Videollamada cifrada en tránsito' : 'Llamada de voz HD'}
-              </AppText>
-            </View>
-          </View>
+          <CallStageLayout
+            isVideo={Boolean(isVideo)}
+            effectivePhase={effectivePhase}
+            remoteShowsVideo={Boolean(remoteShowsVideo)}
+            hasRemoteVideo={false}
+            hasLocalVideo={false}
+            remoteMuted={remoteMuted}
+            micMuted={micMuted}
+            frontCamera={frontCamera}
+            targetTitle={targetTitle}
+            targetAvatar={targetAvatar}
+            statusSubtitle={statusSubtitle}
+            profile={profile}
+          />
         )}
       </View>
 
@@ -594,5 +509,263 @@ function CallControlButton({
         {label}
       </AppText>
     </Pressable>
+  );
+}
+
+type CallStageProps = {
+  isVideo: boolean;
+  effectivePhase: CallStatus;
+  remoteShowsVideo: boolean;
+  hasRemoteVideo?: boolean;
+  remoteTrack?: TrackReferenceOrPlaceholder;
+  hasLocalVideo?: boolean;
+  localTrack?: TrackReferenceOrPlaceholder;
+  remoteMuted: boolean;
+  micMuted: boolean;
+  frontCamera: boolean;
+  targetTitle: string;
+  targetAvatar?: string | null;
+  statusSubtitle: string;
+  profile?: { display_name?: string | null; avatar_path?: string | null } | null;
+};
+
+function LiveKitConnectedStage(
+  props: Omit<
+    CallStageProps,
+    'hasRemoteVideo' | 'remoteTrack' | 'hasLocalVideo' | 'localTrack'
+  >,
+) {
+  const tracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
+  const { localParticipant } = useLocalParticipant();
+
+  useEffect(() => {
+    if (localParticipant) {
+      localParticipant.setMicrophoneEnabled(!props.micMuted).catch(() => {});
+    }
+  }, [localParticipant, props.micMuted]);
+
+  useEffect(() => {
+    if (localParticipant) {
+      localParticipant.setCameraEnabled(Boolean(props.isVideo)).catch(() => {});
+    }
+  }, [localParticipant, props.isVideo]);
+
+  const remoteTrack = tracks.find(
+    (t) => isTrackReference(t) && !t.participant.isLocal && t.publication?.track,
+  );
+  const localTrack = tracks.find(
+    (t) => isTrackReference(t) && t.participant.isLocal && t.publication?.track,
+  );
+
+  const hasRemoteVideo = Boolean(remoteTrack && !remoteTrack.publication?.isMuted);
+  const hasLocalVideo = Boolean(localTrack && !localTrack.publication?.isMuted);
+
+  return (
+    <CallStageLayout
+      {...props}
+      hasRemoteVideo={hasRemoteVideo}
+      remoteTrack={remoteTrack}
+      hasLocalVideo={hasLocalVideo}
+      localTrack={localTrack}
+    />
+  );
+}
+
+function CallStageLayout({
+  isVideo,
+  effectivePhase,
+  remoteShowsVideo,
+  hasRemoteVideo,
+  remoteTrack,
+  hasLocalVideo,
+  localTrack,
+  remoteMuted,
+  micMuted,
+  frontCamera,
+  targetTitle,
+  targetAvatar,
+  statusSubtitle,
+  profile,
+}: CallStageProps) {
+  if (remoteShowsVideo && effectivePhase === 'ongoing') {
+    return (
+      <View
+        style={{
+          width: '100%',
+          flex: 1,
+          marginVertical: 20,
+          borderRadius: 28,
+          backgroundColor: '#151326',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          position: 'relative',
+        }}>
+        {hasRemoteVideo && remoteTrack && isTrackReference(remoteTrack) ? (
+          <VideoTrack
+            trackRef={remoteTrack}
+            style={StyleSheet.absoluteFill}
+            objectFit="cover"
+          />
+        ) : (
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <Avatar name={targetTitle} uri={targetAvatar} size={116} />
+            <AppText
+              variant="subtitle"
+              color="#FFFFFF"
+              style={{ marginTop: 16, fontSize: 22 }}>
+              {targetTitle}
+            </AppText>
+            <AppText
+              variant="caption"
+              color="rgba(255,255,255,0.65)"
+              style={{ marginTop: 4 }}>
+              {statusSubtitle} · {isVideo ? 'Vídeo HD activo' : 'Llamada de voz'}
+            </AppText>
+          </View>
+        )}
+
+        {remoteMuted ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: 16,
+              left: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 999,
+              backgroundColor: 'rgba(229, 72, 77, 0.45)',
+            }}>
+            <Icon name="mic-off" size={14} color={CALL_COLORS.rose400} />
+            <AppText variant="micro" color="#FFFFFF">
+              Micrófono silenciado
+            </AppText>
+          </View>
+        ) : null}
+
+        {/* Vista previa local Picture-in-Picture */}
+        {isVideo ? (
+          <View
+            style={{
+              position: 'absolute',
+              right: 16,
+              bottom: 16,
+              width: 108,
+              height: 148,
+              borderRadius: 18,
+              backgroundColor: '#221F38',
+              borderWidth: 1.5,
+              borderColor: CALL_COLORS.indigo400,
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+            }}>
+            {hasLocalVideo && localTrack && isTrackReference(localTrack) ? (
+              <VideoTrack
+                trackRef={localTrack}
+                mirror={frontCamera}
+                style={StyleSheet.absoluteFill}
+                objectFit="cover"
+              />
+            ) : (
+              <View style={{ alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+                <Avatar
+                  name={profile?.display_name ?? 'Tú'}
+                  uri={profile?.avatar_path}
+                  size={48}
+                />
+                <AppText
+                  variant="micro"
+                  color="#FFFFFF"
+                  style={{ marginTop: 8, fontWeight: '600' }}>
+                  Tú ({frontCamera ? 'Frontal' : 'Trasera'})
+                </AppText>
+              </View>
+            )}
+            {micMuted ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: 6,
+                  right: 6,
+                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  padding: 3,
+                  borderRadius: 10,
+                }}>
+                <Icon name="mic-off" size={13} color={CALL_COLORS.rose400} />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <View
+        style={{
+          width: 164,
+          height: 164,
+          borderRadius: 82,
+          backgroundColor: 'rgba(91, 75, 232, 0.14)',
+          borderWidth: 1,
+          borderColor: 'rgba(124, 110, 242, 0.35)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <View
+          style={{
+            width: 136,
+            height: 136,
+            borderRadius: 68,
+            backgroundColor: 'rgba(91, 75, 232, 0.24)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Avatar name={targetTitle} uri={targetAvatar} size={112} />
+        </View>
+      </View>
+
+      <AppText
+        variant="title"
+        color="#FFFFFF"
+        style={{ marginTop: 22, textAlign: 'center' }}>
+        {targetTitle}
+      </AppText>
+
+      <AppText
+        variant="body"
+        color="rgba(255,255,255,0.7)"
+        style={{ marginTop: 6 }}>
+        {statusSubtitle}
+      </AppText>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 14,
+          paddingHorizontal: 12,
+          paddingVertical: 5,
+          borderRadius: 999,
+          backgroundColor: 'rgba(255,255,255,0.07)',
+        }}>
+        <Icon
+          name={isVideo ? 'videocam-outline' : 'call-outline'}
+          size={14}
+          color={CALL_COLORS.indigo400}
+        />
+        <AppText variant="micro" color="rgba(255,255,255,0.75)">
+          {isVideo ? 'Videollamada cifrada en tránsito' : 'Llamada de voz HD'}
+        </AppText>
+      </View>
+    </View>
   );
 }
