@@ -40,7 +40,7 @@ service-account*.json
 fcm-service-account.json
 *firebase-adminsdk*.json
 credentials*.json
-google-services.json
+# google-services.json tracked for EAS Android build
 # generated native folders
 /ios
 /android

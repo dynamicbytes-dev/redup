@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "176345561155",
+    "project_id": "redup-c15d6",
+    "storage_bucket": "redup-c15d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:176345561155:android:1b5f7d3a84d84d094f7cf6",
+        "android_client_info": {
+          "package_name": "app.redup.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvXpNlT1rqzQ3tRbM9PIpvfVBx0UXE4Gw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
