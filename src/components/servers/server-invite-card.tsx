@@ -207,3 +207,4 @@ export function ServerInviteCard({ inviteCode, isMine = false }: Props) {
     </Pressable>
   );
 }
+
