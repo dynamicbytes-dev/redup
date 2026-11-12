@@ -8,7 +8,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { ActionSheet, type SheetOption } from '@/components/ui/action-sheet';
 import { AppText } from '@/components/ui/app-text';
@@ -51,6 +51,15 @@ export function Composer({
   const [pendingMedia, setPendingMedia] = useState<PickedMedia | null>(null);
   const [attachSheetOpen, setAttachSheetOpen] = useState(false);
   const [recordingActive, setRecordingActive] = useState(false);
+  const [emojiBarOpen, setEmojiBarOpen] = useState(false);
+
+  const QUICK_EMOJIS = ['❤️', '🔥', '😂', '😍', '⚡', '🍜', '👍', '🦊', '👁️', '🗡️', '🥋', '🍃', '💀', '🙏'];
+
+  function handleInsertEmoji(emoji: string) {
+    setText((prev) => prev + emoji);
+    Haptics.selectionAsync().catch(() => {});
+    onTyping();
+  }
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder, 200);
@@ -344,6 +353,36 @@ export function Composer({
         </View>
       ) : null}
 
+      {emojiBarOpen ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+            borderRadius: 14,
+            paddingVertical: 6,
+            paddingHorizontal: 8,
+            marginBottom: 8,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {QUICK_EMOJIS.map((emoji) => (
+              <Pressable
+                key={emoji}
+                onPress={() => handleInsertEmoji(emoji)}
+                style={({ pressed }) => ({
+                  padding: 6,
+                  borderRadius: 8,
+                  backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
+                })}>
+                <AppText style={{ fontSize: 22 }}>{emoji}</AppText>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+
       {isRecording ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 46 }}>
           <Pressable
@@ -469,6 +508,16 @@ export function Composer({
                 maxHeight: 120,
               }}
             />
+            <Pressable
+              hitSlop={6}
+              onPress={() => setEmojiBarOpen((prev) => !prev)}
+              style={{ paddingBottom: 11, paddingRight: 6 }}>
+              <Icon
+                name={emojiBarOpen ? 'close-circle' : 'happy-outline'}
+                size={22}
+                color={emojiBarOpen ? colors.accent : colors.textMuted}
+              />
+            </Pressable>
           </View>
 
           <Pressable

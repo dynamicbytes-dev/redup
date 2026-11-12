@@ -200,9 +200,106 @@ export async function presentLocalMessageNotification(input: {
       body: input.body,
       sound: 'default',
       data: {
+        type: 'chat_message',
         conversationId: input.conversationId,
         messageId: input.messageId ?? null,
         url: `/chat/${input.conversationId}`,
+      },
+    },
+    trigger: null,
+  }).catch(() => {});
+}
+
+export async function presentFriendNotification(input: {
+  title: string;
+  body: string;
+  senderId?: string;
+}): Promise<void> {
+  if (Platform.OS === 'web') return;
+  ensureNotificationHandlerConfigured();
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: input.title,
+      body: input.body,
+      sound: 'default',
+      data: {
+        type: 'friend_request',
+        url: '/(app)/(tabs)/friends',
+      },
+    },
+    trigger: null,
+  }).catch(() => {});
+}
+
+export async function presentServerChannelNotification(input: {
+  serverId: string;
+  channelId: string;
+  serverName: string;
+  channelName: string;
+  senderName: string;
+  body: string;
+}): Promise<void> {
+  if (Platform.OS === 'web') return;
+  ensureNotificationHandlerConfigured();
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `${input.serverName} · #${input.channelName}`,
+      body: `${input.senderName}: ${input.body}`,
+      sound: 'default',
+      data: {
+        type: 'server_message',
+        serverId: input.serverId,
+        channelId: input.channelId,
+        url: `/server/${input.serverId}/channel/${input.channelId}`,
+      },
+    },
+    trigger: null,
+  }).catch(() => {});
+}
+
+export async function presentWallNotification(input: {
+  title: string;
+  body: string;
+  postId?: string;
+}): Promise<void> {
+  if (Platform.OS === 'web') return;
+  ensureNotificationHandlerConfigured();
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: input.title,
+      body: input.body,
+      sound: 'default',
+      data: {
+        type: 'wall',
+        postId: input.postId ?? null,
+        url: '/(app)/(tabs)/wall',
+      },
+    },
+    trigger: null,
+  }).catch(() => {});
+}
+
+export async function presentCallNotification(input: {
+  callId: string;
+  callerName: string;
+  isVideo: boolean;
+}): Promise<void> {
+  if (Platform.OS === 'web') return;
+  ensureNotificationHandlerConfigured();
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `📞 Llamada entrante de ${input.callerName}`,
+      body: `Toca para responder la ${input.isVideo ? 'videollamada' : 'llamada de voz'}.`,
+      sound: 'default',
+      priority: Notifications.AndroidNotificationPriority.MAX,
+      data: {
+        type: 'call',
+        callId: input.callId,
+        url: `/call/${input.callId}`,
       },
     },
     trigger: null,

@@ -24,6 +24,7 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ServerInviteCard } from '@/components/servers/server-invite-card';
+import { ServerVoiceFloatingBar } from '@/components/servers/server-voice-controls';
 import { ActionSheet, type SheetOption } from '@/components/ui/action-sheet';
 import { AppText } from '@/components/ui/app-text';
 import { Avatar } from '@/components/ui/avatar';
@@ -99,11 +100,20 @@ export default function ServerChannelScreen() {
       });
     };
 
+    const onFrame = (e: any) => {
+      const h = Math.max(0, e?.endCoordinates?.height ?? 0);
+      if (h > 0) {
+        fallbackKeyboardHeight.value = h;
+      }
+    };
+
     const subs = [
       Keyboard.addListener('keyboardWillShow', onShow),
       Keyboard.addListener('keyboardDidShow', onShow),
       Keyboard.addListener('keyboardWillHide', onHide),
       Keyboard.addListener('keyboardDidHide', onHide),
+      Keyboard.addListener('keyboardWillChangeFrame', onFrame),
+      Keyboard.addListener('keyboardDidChangeFrame', onFrame),
     ];
 
     return () => {
@@ -596,6 +606,9 @@ export default function ServerChannelScreen() {
           </SafeAreaView>
         </View>
       </Modal>
+
+      {/* Control flotante de canal de voz activo */}
+      <ServerVoiceFloatingBar />
     </SafeAreaView>
   );
 }

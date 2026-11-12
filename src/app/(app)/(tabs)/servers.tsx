@@ -36,13 +36,17 @@ import {
   useMyServers,
   useServerChannels,
 } from '@/features/servers/hooks';
+import { ServerVoiceFloatingBar } from '@/components/servers/server-voice-controls';
+import { useServerVoiceStore } from '@/features/servers/voice-store';
 import type { ChannelType, Server, ServerPreview } from '@/lib/types';
 import { useTheme } from '@/theme';
 
 export default function ServersTabScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { userId } = useSession();
+  const { userId, profile } = useSession();
+
+  const voiceStore = useServerVoiceStore();
 
   const { data: servers = [], isLoading: loadingServers } = useMyServers(userId);
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
@@ -589,31 +593,107 @@ export default function ServersTabScreen() {
                           ) : null}
                         </View>
 
-                        {voiceChannels.map((channel) => (
-                          <Pressable
-                            key={channel.id}
-                            onPress={() => {
-                              Alert.alert(
-                                'Canal de voz',
-                                `Conectando a "${channel.name}". Puedes usar los canales de texto mientras hablas.`,
-                              );
-                            }}
-                            style={({ pressed }) => ({
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 10,
-                              paddingVertical: 9,
-                              paddingHorizontal: 12,
-                              borderRadius: 10,
-                              backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
-                              marginVertical: 1,
-                            })}>
-                            <Icon name="volume-medium-outline" size={18} color={colors.textFaint} />
-                            <AppText variant="body" color={colors.text} numberOfLines={1}>
-                              {channel.name}
-                            </AppText>
-                          </Pressable>
-                        ))}
+                        {voiceChannels.map((channel) => {
+                          const isActive = voiceStore.activeChannel?.id === channel.id && voiceStore.isConnected;
+                          const isConnectingThis = voiceStore.activeChannel?.id === channel.id && voiceStore.isConnecting;
+
+                          return (
+                            <View key={channel.id} style={{ marginVertical: 2 }}>
+                              <Pressable
+                                onPress={() => {
+                                  if (isActive) {
+                                    voiceStore.leaveChannel();
+                                  } else if (activeServer && profile) {
+                                    voiceStore.joinChannel(channel, activeServer, profile);
+                                  }
+                                }}
+                                style={({ pressed }) => ({
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  paddingVertical: 9,
+                                  paddingHorizontal: 12,
+                                  borderRadius: 10,
+                                  backgroundColor: isActive
+                                    ? 'rgba(34, 197, 94, 0.12)'
+                                    : pressed
+                                      ? colors.surfaceAlt
+                                      : 'transparent',
+                                })}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                                  <Icon
+                                    name={isActive ? 'volume-high' : 'volume-medium-outline'}
+                                    size={18}
+                                    color={isActive ? '#22C55E' : colors.textFaint}
+                                  />
+                                  <AppText
+                                    variant="body"
+                                    color={isActive ? '#22C55E' : colors.text}
+                                    style={{ fontWeight: isActive ? '700' : '400' }}
+                                    numberOfLines={1}>
+                                    {channel.name}
+                                  </AppText>
+                                </View>
+
+                                {isConnectingThis ? (
+                                  <ActivityIndicator size="small" color={colors.accent} />
+                                ) : isActive ? (
+                                  <View
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      backgroundColor: '#22C55E',
+                                      paddingHorizontal: 7,
+                                      paddingVertical: 2,
+                                      borderRadius: 6,
+                                    }}>
+                                    <AppText style={{ fontSize: 10, color: '#FFFFFF', fontWeight: '800' }}>
+                                      EN VIVO
+                                    </AppText>
+                                  </View>
+                                ) : null}
+                              </Pressable>
+
+                              {/* Lista de avatares conectados al canal de voz */}
+                              {isActive && voiceStore.participants.length > 0 ? (
+                                <View style={{ paddingLeft: 34, paddingTop: 4, paddingBottom: 6, gap: 6 }}>
+                                  {voiceStore.participants.map((p) => (
+                                    <View
+                                      key={p.userId}
+                                      style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        paddingRight: 8,
+                                      }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <View
+                                          style={{
+                                            borderWidth: 1.5,
+                                            borderColor: p.isSpeaking ? '#22C55E' : 'transparent',
+                                            borderRadius: 12,
+                                            padding: 1,
+                                          }}>
+                                          <Avatar name={p.displayName} uri={p.avatarPath} size={22} />
+                                        </View>
+                                        <AppText
+                                          variant="micro"
+                                          color={p.isSpeaking ? '#22C55E' : colors.textMuted}
+                                          style={{ fontWeight: p.isSpeaking ? '700' : '400' }}>
+                                          {p.displayName}
+                                        </AppText>
+                                      </View>
+                                      {p.isMuted ? (
+                                        <Icon name="mic-off" size={14} color={colors.danger} />
+                                      ) : null}
+                                    </View>
+                                  ))}
+                                </View>
+                              ) : null}
+                            </View>
+                          );
+                        })}
                       </View>
                     ) : null}
                   </>
@@ -1000,6 +1080,9 @@ export default function ServersTabScreen() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Barra de voz flotante activa al estilo Discord */}
+      <ServerVoiceFloatingBar />
     </SafeAreaView>
   );
 }

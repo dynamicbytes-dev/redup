@@ -85,75 +85,113 @@ Deno.serve(async (req: Request) => {
 
     const body = (await req.json().catch(() => ({}))) as {
       conversationId?: string;
+      channelId?: string;
       roomName?: string;
       displayName?: string;
     };
 
+    const channelId = body?.channelId?.trim();
     const conversationId = body?.conversationId?.trim();
-    const requestedRoom = body?.roomName?.trim();
+    let requestedRoom = body?.roomName?.trim();
 
-    if (!conversationId || !requestedRoom) {
-      return securityResponse({ error: 'bad_request: missing conversationId or roomName' }, { status: 400 });
-    }
-
-    if (!UUID_REGEX.test(conversationId)) {
-      return securityResponse({ error: 'bad_request: invalid conversationId UUID' }, { status: 400 });
-    }
-
-    // =========================================================================
-    // 1. VALIDAR QUE EL USUARIO PERTENEZCA A LA CONVERSACIÓN
-    // =========================================================================
-    const { data: membership } = await client
-      .from('conversation_members')
-      .select('conversation_id')
-      .eq('conversation_id', conversationId)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!membership) {
+    if (!channelId && (!conversationId || !requestedRoom)) {
       return securityResponse(
-        { error: 'forbidden: you are not a member of this conversation' },
-        { status: 403 },
+        { error: 'bad_request: missing channelId OR (conversationId and roomName)' },
+        { status: 400 },
       );
     }
 
-    // =========================================================================
-    // 2. BLINDAJE DE SALA: COMPROBAR QUE LA SALA PERTENECE A ESTA CONVERSACIÓN
-    // =========================================================================
-    // La sala debe:
-    // a) Existir registrada en call_logs para esta conversación específica (y no estar finalizada).
-    // O b) Seguir el formato canónico estricto 'redup-<conversationId>' o prefijado por el UUID completo.
-    const canonicalPrefix = `redup-${conversationId}`;
-    const isCanonical = requestedRoom === canonicalPrefix || requestedRoom.startsWith(`${canonicalPrefix}-`);
+    if (channelId) {
+      if (!UUID_REGEX.test(channelId)) {
+        return securityResponse({ error: 'bad_request: invalid channelId UUID' }, { status: 400 });
+      }
 
-    let isBound = isCanonical;
-
-    if (!isBound) {
-      const { data: callLog } = await client
-        .from('call_logs')
-        .select('id, conversation_id, status, room_name')
-        .eq('conversation_id', conversationId)
-        .eq('room_name', requestedRoom)
+      // Validar que el canal sea de voz y pertenezca a un servidor
+      const { data: channel, error: chError } = await client
+        .from('server_channels')
+        .select('id, server_id, name, type')
+        .eq('id', channelId)
         .maybeSingle();
 
-      if (callLog) {
-        // Si la llamada ya terminó, no se permite unirse a la sala
-        if (['completed', 'declined', 'missed'].includes(callLog.status)) {
-          return securityResponse(
-            { error: 'forbidden: call session has already ended' },
-            { status: 403 },
-          );
-        }
-        isBound = true;
+      if (chError || !channel) {
+        return securityResponse({ error: 'not_found: channel not found' }, { status: 404 });
       }
-    }
 
-    // Si la sala solicitada no pertenece a esta conversación, bloqueamos el intento de espionaje
-    if (!isBound) {
-      return securityResponse(
-        { error: 'forbidden: requested room is not bound to this conversation' },
-        { status: 403 },
-      );
+      if (channel.type !== 'voice') {
+        return securityResponse({ error: 'bad_request: channel is not a voice channel' }, { status: 400 });
+      }
+
+      // Validar que el usuario sea miembro del servidor
+      const { data: serverMembership } = await client
+        .from('server_members')
+        .select('server_id')
+        .eq('server_id', channel.server_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!serverMembership) {
+        return securityResponse(
+          { error: 'forbidden: you are not a member of this server' },
+          { status: 403 },
+        );
+      }
+
+      requestedRoom = `server-voice-${channelId}`;
+    } else {
+      if (!UUID_REGEX.test(conversationId!)) {
+        return securityResponse({ error: 'bad_request: invalid conversationId UUID' }, { status: 400 });
+      }
+
+      // =========================================================================
+      // 1. VALIDAR QUE EL USUARIO PERTENEZCA A LA CONVERSACIÓN
+      // =========================================================================
+      const { data: membership } = await client
+        .from('conversation_members')
+        .select('conversation_id')
+        .eq('conversation_id', conversationId!)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!membership) {
+        return securityResponse(
+          { error: 'forbidden: you are not a member of this conversation' },
+          { status: 403 },
+        );
+      }
+
+      // =========================================================================
+      // 2. BLINDAJE DE SALA: COMPROBAR QUE LA SALA PERTENECE A ESTA CONVERSACIÓN
+      // =========================================================================
+      const canonicalPrefix = `redup-${conversationId}`;
+      const isCanonical = requestedRoom === canonicalPrefix || requestedRoom!.startsWith(`${canonicalPrefix}-`);
+
+      let isBound = isCanonical;
+
+      if (!isBound) {
+        const { data: callLog } = await client
+          .from('call_logs')
+          .select('id, conversation_id, status, room_name')
+          .eq('conversation_id', conversationId!)
+          .eq('room_name', requestedRoom!)
+          .maybeSingle();
+
+        if (callLog) {
+          if (['completed', 'declined', 'missed'].includes(callLog.status)) {
+            return securityResponse(
+              { error: 'forbidden: call session has already ended' },
+              { status: 403 },
+            );
+          }
+          isBound = true;
+        }
+      }
+
+      if (!isBound) {
+        return securityResponse(
+          { error: 'forbidden: requested room is not bound to this conversation' },
+          { status: 403 },
+        );
+      }
     }
 
     if (!livekitApiKey || !livekitApiSecret || !livekitUrl) {

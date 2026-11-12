@@ -37,11 +37,20 @@ export function useKeyboardHeight(): number {
       setHeight(0);
     };
 
+    const onFrameHeight = (e: any) => {
+      const nextHeight = Math.max(0, e?.endCoordinates?.height ?? 0);
+      if (nextHeight > 0) {
+        setHeight(nextHeight);
+      }
+    };
+
     const subs = [
       Keyboard.addListener('keyboardWillShow', onShow),
       Keyboard.addListener('keyboardDidShow', onShow),
       Keyboard.addListener('keyboardWillHide', onHide),
       Keyboard.addListener('keyboardDidHide', onHide),
+      Keyboard.addListener('keyboardWillChangeFrame', onFrameHeight),
+      Keyboard.addListener('keyboardDidChangeFrame', onFrameHeight),
     ];
 
     return () => {
@@ -110,11 +119,21 @@ export function useKeyboardAutoScroll() {
       setKeyboardHeight(0);
     };
 
+    const onFrameScroll = (e: any) => {
+      const nextHeight = Math.max(0, e?.endCoordinates?.height ?? 0);
+      if (nextHeight > 0) {
+        keyboardHeightRef.current = nextHeight;
+        setKeyboardHeight(nextHeight);
+      }
+    };
+
     const subs = [
       Keyboard.addListener('keyboardWillShow', onShow),
       Keyboard.addListener('keyboardDidShow', onShow),
       Keyboard.addListener('keyboardWillHide', onHide),
       Keyboard.addListener('keyboardDidHide', onHide),
+      Keyboard.addListener('keyboardWillChangeFrame', onFrameScroll),
+      Keyboard.addListener('keyboardDidChangeFrame', onFrameScroll),
     ];
 
     const onInputFocus = () => {

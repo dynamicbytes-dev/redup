@@ -16,7 +16,11 @@ import {
   getActiveConversationId,
   getPushEnabledPreference,
   getSavedPushToken,
+  presentCallNotification,
+  presentFriendNotification,
   presentLocalMessageNotification,
+  presentServerChannelNotification,
+  presentWallNotification,
   registerForPushNotificationsAsync,
   scheduleTestNotificationAsync,
   setPushEnabledPreference,
@@ -27,14 +31,20 @@ import {
 function handleNotificationNavigation(response: Notifications.NotificationResponse | null) {
   if (!response) return;
   const data = response.notification.request.content.data as
-    | { conversationId?: string; url?: string }
+    | { conversationId?: string; url?: string; type?: string; serverId?: string; channelId?: string; callId?: string }
     | undefined;
 
-  const conversationId = data?.conversationId;
   Notifications.clearLastNotificationResponse();
 
-  if (conversationId) {
-    router.push(`/chat/${conversationId}`);
+  if (data?.url) {
+    try {
+      router.push(data.url as any);
+      return;
+    } catch {}
+  }
+
+  if (data?.conversationId) {
+    router.push(`/chat/${data.conversationId}`);
   }
 }
 
@@ -143,6 +153,235 @@ export function useNotificationsBootstrap(userId: string | null) {
             title,
             body,
             messageId: msg.id,
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'friend_requests' },
+        async (payload) => {
+          const req = payload.new as { id?: string; sender_id?: string; receiver_id?: string; status?: string } | undefined;
+          if (!req || req.receiver_id !== userId || req.status !== 'pending') return;
+
+          if (notifiedIdsRef.current.has(`fr-${req.id}`)) return;
+          notifiedIdsRef.current.add(`fr-${req.id}`);
+
+          const enabled = await getPushEnabledPreference();
+          if (!enabled) return;
+
+          const { data: sender } = await supabase
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', req.sender_id)
+            .maybeSingle();
+
+          const name = sender?.display_name || (sender?.username ? `@${sender.username}` : 'Un usuario');
+
+          await presentFriendNotification({
+            title: '👥 Solicitud de amistad',
+            body: `${name} te envió una solicitud de amistad en Akatsuki Chat.`,
+            senderId: req.sender_id,
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'friend_requests' },
+        async (payload) => {
+          const req = payload.new as { id?: string; sender_id?: string; receiver_id?: string; status?: string } | undefined;
+          if (!req || req.sender_id !== userId || req.status !== 'accepted') return;
+
+          if (notifiedIdsRef.current.has(`fra-${req.id}`)) return;
+          notifiedIdsRef.current.add(`fra-${req.id}`);
+
+          const enabled = await getPushEnabledPreference();
+          if (!enabled) return;
+
+          const { data: receiver } = await supabase
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', req.receiver_id)
+            .maybeSingle();
+
+          const name = receiver?.display_name || (receiver?.username ? `@${receiver.username}` : 'Tu amigo');
+
+          await presentFriendNotification({
+            title: '✨ ¡Solicitud aceptada!',
+            body: `${name} aceptó tu solicitud. Ahora son amigos en Akatsuki Chat.`,
+            senderId: req.receiver_id,
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'server_channel_messages' },
+        async (payload) => {
+          const msg = payload.new as {
+            id?: string;
+            server_id?: string;
+            channel_id?: string;
+            sender_id?: string;
+            body?: string;
+            kind?: string;
+          } | undefined;
+
+          if (!msg || !msg.id || msg.sender_id === userId || msg.kind === 'system') return;
+
+          if (notifiedIdsRef.current.has(`scm-${msg.id}`)) return;
+          notifiedIdsRef.current.add(`scm-${msg.id}`);
+
+          const enabled = await getPushEnabledPreference();
+          if (!enabled) return;
+
+          // Verificar si el usuario es miembro de este servidor
+          const { data: member } = await supabase
+            .from('server_members')
+            .select('server_id')
+            .eq('server_id', msg.server_id)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (!member) return;
+
+          const [{ data: server }, { data: channel }, { data: sender }] = await Promise.all([
+            supabase.from('servers').select('name').eq('id', msg.server_id).maybeSingle(),
+            supabase.from('server_channels').select('name').eq('id', msg.channel_id).maybeSingle(),
+            supabase.from('profiles').select('display_name, username').eq('id', msg.sender_id).maybeSingle(),
+          ]);
+
+          const serverName = server?.name || 'Servidor';
+          const channelName = channel?.name || 'general';
+          const senderName = sender?.display_name || (sender?.username ? `@${sender.username}` : 'Alguien');
+          const preview = msg.body?.trim() || (msg.kind === 'image' ? '📷 Foto' : 'Mensaje');
+
+          await presentServerChannelNotification({
+            serverId: msg.server_id!,
+            channelId: msg.channel_id!,
+            serverName,
+            channelName,
+            senderName,
+            body: preview,
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'call_logs' },
+        async (payload) => {
+          const call = payload.new as {
+            id?: string;
+            caller_id?: string;
+            callee_id?: string;
+            status?: string;
+            kind?: string;
+          } | undefined;
+
+          if (!call || !call.id || call.callee_id !== userId || call.status !== 'ringing') return;
+
+          if (notifiedIdsRef.current.has(`call-${call.id}`)) return;
+          notifiedIdsRef.current.add(`call-${call.id}`);
+
+          const enabled = await getPushEnabledPreference();
+          if (!enabled) return;
+
+          const { data: caller } = await supabase
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', call.caller_id)
+            .maybeSingle();
+
+          const callerName = caller?.display_name || (caller?.username ? `@${caller.username}` : 'Alguien');
+
+          await presentCallNotification({
+            callId: call.id,
+            callerName,
+            isVideo: call.kind === 'video',
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'wall_post_comments' },
+        async (payload) => {
+          const comment = payload.new as {
+            id?: string;
+            post_id?: string;
+            author_id?: string;
+            content?: string;
+          } | undefined;
+
+          if (!comment || !comment.id || comment.author_id === userId) return;
+
+          if (notifiedIdsRef.current.has(`wpc-${comment.id}`)) return;
+          notifiedIdsRef.current.add(`wpc-${comment.id}`);
+
+          const enabled = await getPushEnabledPreference();
+          if (!enabled) return;
+
+          // Verificar si el post pertenece al usuario actual
+          const { data: post } = await supabase
+            .from('wall_posts')
+            .select('author_id')
+            .eq('id', comment.post_id)
+            .maybeSingle();
+
+          if (!post || post.author_id !== userId) return;
+
+          const { data: author } = await supabase
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', comment.author_id)
+            .maybeSingle();
+
+          const authorName = author?.display_name || (author?.username ? `@${author.username}` : 'Un amigo');
+          const preview = comment.content?.trim().slice(0, 80) || 'Comentario';
+
+          await presentWallNotification({
+            title: '💬 Nuevo comentario en tu muro',
+            body: `${authorName}: "${preview}"`,
+            postId: comment.post_id,
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'wall_post_reactions' },
+        async (payload) => {
+          const reaction = payload.new as {
+            post_id?: string;
+            user_id?: string;
+            reaction?: string;
+          } | undefined;
+
+          if (!reaction || reaction.user_id === userId) return;
+
+          const rKey = `wpr-${reaction.post_id}-${reaction.user_id}`;
+          if (notifiedIdsRef.current.has(rKey)) return;
+          notifiedIdsRef.current.add(rKey);
+
+          const enabled = await getPushEnabledPreference();
+          if (!enabled) return;
+
+          const { data: post } = await supabase
+            .from('wall_posts')
+            .select('author_id')
+            .eq('id', reaction.post_id)
+            .maybeSingle();
+
+          if (!post || post.author_id !== userId) return;
+
+          const { data: reactor } = await supabase
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', reaction.user_id)
+            .maybeSingle();
+
+          const name = reactor?.display_name || (reactor?.username ? `@${reactor.username}` : 'A un amigo');
+
+          await presentWallNotification({
+            title: '❤️ Reacción en tu muro',
+            body: `${name} reaccionó con ${reaction.reaction || '❤️'} a tu publicación.`,
+            postId: reaction.post_id,
           });
         },
       )

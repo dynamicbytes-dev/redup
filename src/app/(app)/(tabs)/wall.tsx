@@ -688,11 +688,20 @@ function PostCommentsModal({
       });
     };
 
+    const onFrame = (e: any) => {
+      const h = Math.max(0, e?.endCoordinates?.height ?? 0);
+      if (h > 0) {
+        fallbackKeyboardHeight.value = h;
+      }
+    };
+
     const subs = [
       Keyboard.addListener('keyboardWillShow', onShow),
       Keyboard.addListener('keyboardDidShow', onShow),
       Keyboard.addListener('keyboardWillHide', onHide),
       Keyboard.addListener('keyboardDidHide', onHide),
+      Keyboard.addListener('keyboardWillChangeFrame', onFrame),
+      Keyboard.addListener('keyboardDidChangeFrame', onFrame),
     ];
 
     return () => {
