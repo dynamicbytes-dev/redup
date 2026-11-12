@@ -11,6 +11,7 @@ import { useTheme } from '@/theme';
 type Props = {
   title?: string;
   subtitle?: string;
+  hero?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   showBack?: boolean;
@@ -20,6 +21,7 @@ type Props = {
 export function AuthShell({
   title,
   subtitle,
+  hero,
   children,
   footer,
   showBack = true,
@@ -55,6 +57,12 @@ export function AuthShell({
           ) : (
             <View style={{ height: 12 }} />
           )}
+
+          {hero ? (
+            <View style={{ alignItems: 'center', marginBottom: 20, marginTop: 4 }}>
+              {hero}
+            </View>
+          ) : null}
 
           {title ? (
             <View style={{ gap: 6, marginBottom: 24, marginTop: 4 }}>

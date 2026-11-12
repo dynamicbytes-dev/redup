@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { AuthShell } from '@/components/auth/auth-shell';
+import { ItachiEyesAnimation } from '@/components/brand/itachi-eyes-animation';
 import { AppText } from '@/components/ui/app-text';
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -31,7 +32,10 @@ export default function LoginScreen() {
   }
 
   return (
-    <AuthShell title="Hola de nuevo" subtitle="Entra con tu usuario o tu correo.">
+    <AuthShell
+      title="Akatsuki Chat"
+      subtitle="Entra con tu usuario o tu correo para sincronizar tu chakra."
+      hero={<ItachiEyesAnimation width={270} />}>
       <ErrorBanner message={error} />
 
       <TextField
