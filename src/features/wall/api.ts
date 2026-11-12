@@ -36,7 +36,7 @@ export async function createWallPost(params: {
       content,
       media_path,
       created_at,
-      author:profiles (
+      author:profiles!wall_posts_author_id_fkey (
         id,
         username,
         display_name,
@@ -48,7 +48,42 @@ export async function createWallPost(params: {
     .single();
 
   if (error || !data) {
-    throw new WallError(error?.message || 'No pudimos publicar en el muro.');
+    // Respaldo resiliente: insertar directamente y obtener perfil si PostgREST rechaza el embed
+    const fallbackInsert = await supabase
+      .from('wall_posts')
+      .insert({
+        author_id: user.user.id,
+        content: params.content.trim(),
+        media_path: params.mediaPath ?? null,
+      })
+      .select('id, author_id, content, media_path, created_at')
+      .single();
+
+    if (fallbackInsert.error || !fallbackInsert.data) {
+      throw new WallError(error?.message || fallbackInsert.error?.message || 'No pudimos publicar en el muro.');
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_path, about, last_seen_at')
+      .eq('id', user.user.id)
+      .single();
+
+    return {
+      ...fallbackInsert.data,
+      author: profile ?? {
+        id: user.user.id,
+        username: 'tú',
+        display_name: 'Tú',
+        avatar_path: null,
+        about: null,
+        last_seen_at: new Date().toISOString(),
+      },
+      is_friend: true,
+      likes_count: 0,
+      comments_count: 0,
+      my_reaction: null,
+    } as unknown as WallPost;
   }
 
   return {
@@ -121,7 +156,7 @@ export async function createWallComment(params: {
       parent_comment_id,
       content,
       created_at,
-      author:profiles (
+      author:profiles!wall_post_comments_author_id_fkey (
         id,
         username,
         display_name,
@@ -132,7 +167,41 @@ export async function createWallComment(params: {
     .single();
 
   if (error || !data) {
-    throw new WallError(error?.message || 'No pudimos publicar el comentario.');
+    // Respaldo resiliente
+    const fallbackInsert = await supabase
+      .from('wall_post_comments')
+      .insert({
+        post_id: params.postId,
+        author_id: user.user.id,
+        content: params.content.trim(),
+        parent_comment_id: params.parentCommentId ?? null,
+      })
+      .select('id, post_id, author_id, parent_comment_id, content, created_at')
+      .single();
+
+    if (fallbackInsert.error || !fallbackInsert.data) {
+      throw new WallError(error?.message || fallbackInsert.error?.message || 'No pudimos publicar el comentario.');
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_path, about')
+      .eq('id', user.user.id)
+      .single();
+
+    return {
+      ...fallbackInsert.data,
+      author: profile ?? {
+        id: user.user.id,
+        username: 'tú',
+        display_name: 'Tú',
+        avatar_path: null,
+        about: null,
+      },
+      is_friend: true,
+      likes_count: 0,
+      my_reaction: null,
+    } as unknown as WallComment;
   }
 
   return {
