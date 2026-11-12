@@ -8,116 +8,97 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
 type Props = {
   width?: number;
   height?: number;
-  onFinished?: () => void;
 };
 
-// Relación de aspecto original del arte: 235 de ancho por 205 de alto (~1.146)
-const ASPECT_RATIO = 235 / 205;
+// Aspect ratio ajustado al recorte exacto de los ojos: 227 ancho x 106 alto (~2.14)
+const ASPECT_RATIO = 227 / 106;
 
-export function ItachiEyesAnimation({ width = 280, height, onFinished }: Props) {
+export function ItachiEyesAnimation({ width = 230, height }: Props) {
   const containerWidth = width;
   const containerHeight = height ?? Math.round(width / ASPECT_RATIO);
 
-  // Progreso de apertura de párpados: 0 (cerrados) a 1 (completamente abiertos)
+  // Progreso de apertura de los ojos: 0 (cerrados) a 1 (abiertos)
   const eyeOpen = useSharedValue(0);
   // Progreso del flujo de sangre de Amaterasu: 0 (sin sangre) a 1 (goteo completo)
   const bloodProgress = useSharedValue(0);
-  // Pulso de resplandor carmesí del Mangekyō Sharingan
-  const auraOpacity = useSharedValue(0);
 
   useEffect(() => {
-    // 1. Iniciar con ojos cerrados (400ms de suspenso en penumbra)
-    // 2. Abrir los ojos con aceleración dramática (anime snap)
+    // 1. Iniciar con ojos cerrados (400ms de suspenso)
+    // 2. Abrir los ojos verticalmente con aceleración anime
     eyeOpen.value = withDelay(
-      450,
+      400,
       withTiming(1, {
-        duration: 750,
+        duration: 650,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
-      }, (finished) => {
-        if (finished) {
-          // Haptic sutil al abrir los ojos
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-        }
       }),
     );
 
-    // 3. Aura siniestra que pulsa al despertar el Mangekyō
-    auraOpacity.value = withDelay(
-      850,
-      withSequence(
-        withTiming(0.85, { duration: 400, easing: Easing.out(Easing.quad) }),
-        withTiming(0.4, { duration: 600, easing: Easing.inOut(Easing.quad) }),
-      ),
-    );
-
-    // 4. El sangrado de Amaterasu comienza en el párpado inferior y fluye hacia abajo
+    // 3. El goteo de sangre comienza cuando los ojos están abiertos
     bloodProgress.value = withDelay(
-      1150,
+      1050,
       withTiming(1, {
-        duration: 1300,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      }, (finished) => {
-        if (finished) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-          if (onFinished) {
-            onFinished();
-          }
-        }
+        duration: 1100,
+        easing: Easing.bezier(0.33, 1, 0.68, 1),
       }),
     );
-  }, [eyeOpen, bloodProgress, auraOpacity, onFinished]);
 
-  // Estilo animado para el párpado superior (se eleva)
-  const topLidStyle = useAnimatedStyle(() => {
-    // Posición Y de los ojos: centro vertical relativo (~48% de la altura)
-    const eyeCenterY = containerHeight * 0.48;
-    const translateY = interpolate(eyeOpen.value, [0, 1], [0, -eyeCenterY]);
+    // Haptics ejecutados de forma 100% segura en el hilo JS (evita cualquier fallo de worklet)
+    const t1 = setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    }, 1050);
+
+    const t2 = setTimeout(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    }, 2150);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [eyeOpen, bloodProgress]);
+
+  // Estilo animado para los ojos abiertos (se abren verticalmente desde la hendidura)
+  const openEyesStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateY }],
+      opacity: interpolate(eyeOpen.value, [0, 0.2, 1], [0, 0.8, 1]),
+      transform: [
+        {
+          scaleY: interpolate(eyeOpen.value, [0, 1], [0.08, 1]),
+        },
+      ],
     };
   });
 
-  // Estilo animado para el párpado inferior (desciende ligeramente)
-  const bottomLidStyle = useAnimatedStyle(() => {
-    const eyeCenterY = containerHeight * 0.48;
-    const translateY = interpolate(eyeOpen.value, [0, 1], [0, containerHeight - eyeCenterY]);
+  // Estilo animado para las líneas de ojos cerrados (se desvanecen al abrir)
+  const closedEyesStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateY }],
+      opacity: interpolate(eyeOpen.value, [0, 0.4], [1, 0]),
+      transform: [
+        {
+          scaleY: interpolate(eyeOpen.value, [0, 0.4], [1, 0.2]),
+        },
+      ],
     };
   });
 
-  // Línea de la hendidura del párpado cerrado
-  const creaseLineStyle = useAnimatedStyle(() => {
-    return {
-      opacity: interpolate(eyeOpen.value, [0, 0.3], [1, 0]),
-    };
-  });
-
-  // Contenedor que recorta la sangre haciéndola fluir hacia abajo
-  const bloodContainerStyle = useAnimatedStyle(() => {
-    // La sangre empieza aproximadamente al 55% de la altura y fluye hasta el 90%
-    const startY = containerHeight * 0.54;
-    const maxBloodHeight = containerHeight * 0.40;
-    const currentHeight = interpolate(bloodProgress.value, [0, 1], [0, maxBloodHeight]);
+  // Contenedor de la sangre: fluye hacia abajo
+  const bloodStyle = useAnimatedStyle(() => {
+    // El goteo de sangre ocurre en el tercio inferior del ojo izquierdo
+    // Inicio del goteo alrededor del 32% de la altura
+    const startY = containerHeight * 0.32;
+    const maxBloodH = containerHeight * 0.68;
+    const currentH = interpolate(bloodProgress.value, [0, 1], [0, maxBloodH]);
 
     return {
       top: startY,
-      height: currentHeight,
-      opacity: interpolate(bloodProgress.value, [0, 0.08], [0, 1]),
-    };
-  });
-
-  // Resplandor carmesí animado
-  const glowStyle = useAnimatedStyle(() => {
-    return {
-      opacity: auraOpacity.value,
+      height: currentH,
+      opacity: interpolate(bloodProgress.value, [0, 0.05], [0, 1]),
     };
   });
 
@@ -125,72 +106,36 @@ export function ItachiEyesAnimation({ width = 280, height, onFinished }: Props) 
     <View
       style={[
         styles.container,
-        { width: containerWidth, height: containerHeight },
+        {
+          width: containerWidth,
+          height: containerHeight,
+        },
       ]}>
-      {/* Resplandor carmesí de fondo (Amaterasu chakra) */}
-      <Animated.View
-        style={[
-          styles.glow,
-          {
-            width: containerWidth * 0.45,
-            height: containerWidth * 0.45,
-            left: containerWidth * 0.05,
-            top: containerHeight * 0.25,
-          },
-          glowStyle,
-        ]}
-      />
+      {/* Ojos cerrados (líneas de pestañas en reposo) */}
+      <Animated.View style={[StyleSheet.absoluteFill, closedEyesStyle]}>
+        <Image
+          source={require('../../../assets/images/itachi-eyes-closed.png')}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+        />
+      </Animated.View>
 
-      {/* Capa base de los ojos (abiertos) */}
-      <Image
-        source={require('../../../assets/images/itachi-eyes-base.png')}
-        style={StyleSheet.absoluteFill}
-        contentFit="contain"
-      />
+      {/* Ojos abiertos (Mangekyō Sharingan + 3-tomoe Sharingan) */}
+      <Animated.View style={[StyleSheet.absoluteFill, openEyesStyle]}>
+        <Image
+          source={require('../../../assets/images/itachi-eyes-open.png')}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+        />
+      </Animated.View>
 
-      {/* Párpado superior (animado) */}
-      <Animated.View
-        style={[
-          styles.lid,
-          {
-            top: 0,
-            height: containerHeight * 0.48,
-          },
-          topLidStyle,
-        ]}
-      />
-
-      {/* Párpado inferior (animado) */}
-      <Animated.View
-        style={[
-          styles.lid,
-          {
-            top: containerHeight * 0.48,
-            height: containerHeight * 0.52,
-          },
-          bottomLidStyle,
-        ]}
-      />
-
-      {/* Línea sutil de párpados cerrados en reposo */}
-      <Animated.View
-        style={[
-          styles.creaseLine,
-          {
-            top: containerHeight * 0.48 - 1,
-            width: containerWidth * 0.88,
-          },
-          creaseLineStyle,
-        ]}
-      />
-
-      {/* Capa de sangre con máscara de flujo hacia abajo */}
-      <Animated.View style={[styles.bloodClipContainer, bloodContainerStyle]}>
+      {/* Flujo de sangre de Amaterasu que brota del ojo izquierdo */}
+      <Animated.View style={[styles.bloodClipper, bloodStyle]}>
         <Image
           source={require('../../../assets/images/itachi-eyes-blood.png')}
           style={{
             position: 'absolute',
-            top: -containerHeight * 0.54,
+            top: -containerHeight * 0.32,
             width: containerWidth,
             height: containerHeight,
           }}
@@ -203,41 +148,17 @@ export function ItachiEyesAnimation({ width = 280, height, onFinished }: Props) 
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent', // Sin fondo negro: se funde con el tema de la pantalla
     alignSelf: 'center',
-    overflow: 'hidden',
+    overflow: 'visible',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 16,
   },
-  glow: {
-    position: 'absolute',
-    borderRadius: 999,
-    backgroundColor: 'rgba(220, 38, 38, 0.35)',
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 30,
-  },
-  lid: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    backgroundColor: '#000000',
-    zIndex: 10,
-  },
-  creaseLine: {
-    position: 'absolute',
-    height: 1.5,
-    backgroundColor: 'rgba(50, 50, 60, 0.65)',
-    zIndex: 15,
-    borderRadius: 1,
-  },
-  bloodClipContainer: {
+  bloodClipper: {
     position: 'absolute',
     left: 0,
     right: 0,
     overflow: 'hidden',
-    zIndex: 20,
+    zIndex: 10,
   },
 });

@@ -35,7 +35,7 @@ export default function LoginScreen() {
     <AuthShell
       title="Akatsuki Chat"
       subtitle="Entra con tu usuario o tu correo para sincronizar tu chakra."
-      hero={<ItachiEyesAnimation width={270} />}>
+      hero={<ItachiEyesAnimation width={220} />}>
       <ErrorBanner message={error} />
 
       <TextField

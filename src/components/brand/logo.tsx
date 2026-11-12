@@ -22,9 +22,9 @@ export function Logo({ size = 60 }: { size?: number }) {
         elevation: 8,
       }}>
       <Image
-        source={require('../../../assets/images/icon.png')}
+        source={require('../../../assets/images/logo.png')}
         style={{ width: '100%', height: '100%' }}
-        contentFit="cover"
+        contentFit="contain"
       />
     </View>
   );
@@ -43,7 +43,7 @@ export function Wordmark({ size = 26, color }: { size?: number; color: string })
         gap: 6,
       }}>
       <Image
-        source={require('../../../assets/images/icon.png')}
+        source={require('../../../assets/images/logo.png')}
         style={{
           width: size * 0.9,
           height: size * 0.9,
@@ -51,7 +51,7 @@ export function Wordmark({ size = 26, color }: { size?: number; color: string })
           borderWidth: 1,
           borderColor: brand.crimson,
         }}
-        contentFit="cover"
+        contentFit="contain"
       />
       <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
         <AppText

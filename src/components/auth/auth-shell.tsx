@@ -59,7 +59,7 @@ export function AuthShell({
           )}
 
           {hero ? (
-            <View style={{ alignItems: 'center', marginBottom: 20, marginTop: 4 }}>
+            <View style={{ alignItems: 'center', marginBottom: 8, marginTop: 0 }}>
               {hero}
             </View>
           ) : null}
