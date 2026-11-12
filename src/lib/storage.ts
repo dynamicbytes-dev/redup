@@ -13,8 +13,14 @@ export function avatarUrl(path: string | null | undefined): string | null {
 
 const signedCache = new Map<string, { url: string; expiresAt: number }>();
 
-/** URL firmada para un archivo del bucket privado `media` con caché en memoria. */
-export async function signedMediaUrl(path: string | null | undefined, expiresIn = 60 * 60) {
+export type StorageBucket = 'media' | 'statuses' | 'avatars';
+
+/** URL firmada para un archivo de storage (por defecto `media`) con caché en memoria. */
+export async function signedMediaUrl(
+  path: string | null | undefined,
+  expiresIn = 60 * 60,
+  bucket: StorageBucket = 'media',
+) {
   if (!path) return null;
   if (
     path.startsWith('http://') ||
@@ -26,17 +32,18 @@ export async function signedMediaUrl(path: string | null | undefined, expiresIn 
     return path;
   }
 
-  const cached = signedCache.get(path);
+  const cacheKey = `${bucket}:${path}`;
+  const cached = signedCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.url;
   }
 
-  const { data, error } = await supabase.storage.from('media').createSignedUrl(path, expiresIn);
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
   if (error || !data?.signedUrl) return null;
 
   const normalizedUrl = normalizeLocalSupabaseUrl(data.signedUrl);
 
-  signedCache.set(path, {
+  signedCache.set(cacheKey, {
     url: normalizedUrl,
     expiresAt: Date.now() + (expiresIn - 120) * 1000,
   });
@@ -44,9 +51,14 @@ export async function signedMediaUrl(path: string | null | undefined, expiresIn 
   return normalizedUrl;
 }
 
-/** Hook que resuelve y memoriza la URL firmada de un archivo en `media`. */
-export function useSignedMediaUrl(path: string | null | undefined): string | null {
-  const [resolved, setResolved] = useState<{ path: string; url: string | null } | null>(() => {
+/** Hook que resuelve y memoriza la URL firmada de un archivo de storage (por defecto `media`). */
+export function useSignedMediaUrl(
+  path: string | null | undefined,
+  bucket: StorageBucket = 'media',
+): string | null {
+  const cacheKey = path ? `${bucket}:${path}` : '';
+
+  const [resolved, setResolved] = useState<{ key: string; url: string | null } | null>(() => {
     if (!path) return null;
     if (
       path.startsWith('http://') ||
@@ -55,11 +67,11 @@ export function useSignedMediaUrl(path: string | null | undefined): string | nul
       path.startsWith('blob:') ||
       path.startsWith('data:')
     ) {
-      return { path, url: path };
+      return { key: cacheKey, url: path };
     }
-    const cached = signedCache.get(path);
+    const cached = signedCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      return { path, url: cached.url };
+      return { key: cacheKey, url: cached.url };
     }
     return null;
   });
@@ -77,16 +89,16 @@ export function useSignedMediaUrl(path: string | null | undefined): string | nul
     }
 
     let cancelled = false;
-    signedMediaUrl(path).then((url) => {
+    signedMediaUrl(path, 60 * 60, bucket).then((url) => {
       if (!cancelled) {
-        setResolved({ path, url });
+        setResolved({ key: cacheKey, url });
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, bucket, cacheKey]);
 
   if (!path) return null;
   if (
@@ -98,5 +110,5 @@ export function useSignedMediaUrl(path: string | null | undefined): string | nul
   ) {
     return path;
   }
-  return resolved?.path === path ? resolved.url : (signedCache.get(path)?.url ?? null);
+  return resolved?.key === cacheKey ? resolved.url : (signedCache.get(cacheKey)?.url ?? null);
 }

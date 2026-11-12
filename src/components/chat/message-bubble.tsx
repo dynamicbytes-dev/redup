@@ -130,33 +130,12 @@ export function MessageBubble({
         ) : null}
 
         {replyTo ? (
-          <View
-            style={{
-              borderLeftWidth: 3,
-              borderLeftColor: isMine ? 'rgba(255,255,255,0.55)' : colors.primary,
-              backgroundColor: isMine ? 'rgba(255,255,255,0.12)' : colors.surface,
-              borderRadius: 8,
-              paddingHorizontal: 8,
-              paddingVertical: 5,
-              marginBottom: 2,
-              marginHorizontal: message.kind === 'image' && !deleted ? 4 : 0,
-            }}>
-            {repliedName ? (
-              <AppText
-                variant="micro"
-                style={{ color: isMine ? '#FFFFFF' : colors.primary, fontWeight: '700' }}>
-                {repliedName}
-              </AppText>
-            ) : null}
-            <AppText
-              variant="caption"
-              numberOfLines={2}
-              style={{ color: isMine ? 'rgba(255,255,255,0.85)' : colors.textMuted }}>
-              {replyTo.deleted_at
-                ? 'Mensaje eliminado'
-                : messagePreview(replyTo.kind, replyTo.body)}
-            </AppText>
-          </View>
+          <ReplyToBanner
+            replyTo={replyTo}
+            repliedName={repliedName}
+            isMine={isMine}
+            marginHorizontal={message.kind === 'image' && !deleted ? 4 : 0}
+          />
         ) : null}
 
         {storyReply && !deleted ? (
@@ -570,6 +549,117 @@ function FileBubbleContent({
   );
 }
 
+function ReplyToBanner({
+  replyTo,
+  repliedName,
+  isMine,
+  marginHorizontal,
+}: {
+  replyTo: ChatMessage;
+  repliedName?: string | null;
+  isMine: boolean;
+  marginHorizontal?: number;
+}) {
+  const { colors } = useTheme();
+  const isImage = replyTo.kind === 'image' && Boolean(replyTo.media_path);
+  const imageUrl = useSignedMediaUrl(isImage ? replyTo.media_path : null, 'media');
+  const isAudio = replyTo.kind === 'audio';
+  const isFile = replyTo.kind === 'file';
+  const replyStory = (replyTo.media_meta as { story_reply?: StoryReplyMeta } | null)?.story_reply;
+  const replyStoryUrl = useSignedMediaUrl(
+    replyStory?.kind === 'image' ? replyStory.media_path : null,
+    'statuses',
+  );
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderLeftWidth: 3,
+        borderLeftColor: isMine ? 'rgba(255,255,255,0.7)' : colors.primary,
+        backgroundColor: isMine ? 'rgba(255,255,255,0.14)' : colors.surface,
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        marginBottom: 3,
+        marginHorizontal: marginHorizontal ?? 0,
+        gap: 8,
+      }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {repliedName ? (
+          <AppText
+            variant="micro"
+            style={{ color: isMine ? '#FFFFFF' : colors.primary, fontWeight: '700' }}>
+            {repliedName}
+          </AppText>
+        ) : null}
+        <AppText
+          variant="caption"
+          numberOfLines={2}
+          style={{ color: isMine ? 'rgba(255,255,255,0.88)' : colors.textMuted }}>
+          {replyTo.deleted_at
+            ? 'Mensaje eliminado'
+            : messagePreview(replyTo.kind, replyTo.body)}
+        </AppText>
+      </View>
+
+      {/* Miniatura si el mensaje respondido es imagen o estado con imagen */}
+      {!replyTo.deleted_at && isImage && imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: colors.surfaceAlt }}
+          contentFit="cover"
+        />
+      ) : !replyTo.deleted_at && replyStory ? (
+        replyStoryUrl ? (
+          <Image
+            source={{ uri: replyStoryUrl }}
+            style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: colors.surfaceAlt }}
+            contentFit="cover"
+          />
+        ) : (
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 6,
+              backgroundColor: replyStory.bg_color || colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Icon name="flash" size={16} color="#FFFFFF" />
+          </View>
+        )
+      ) : !replyTo.deleted_at && isAudio ? (
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 6,
+            backgroundColor: isMine ? 'rgba(255,255,255,0.2)' : colors.primarySoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name="mic" size={16} color={isMine ? '#FFFFFF' : colors.primary} />
+        </View>
+      ) : !replyTo.deleted_at && isFile ? (
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 6,
+            backgroundColor: isMine ? 'rgba(255,255,255,0.2)' : colors.primarySoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name="document-text" size={16} color={isMine ? '#FFFFFF' : colors.primary} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function StoryReplyHeader({
   storyReply,
   isMine,
@@ -579,14 +669,14 @@ function StoryReplyHeader({
 }) {
   const { colors } = useTheme();
   const isImage = storyReply.kind === 'image';
-  const signedUrl = useSignedMediaUrl(isImage ? storyReply.media_path : null);
+  const signedUrl = useSignedMediaUrl(isImage ? storyReply.media_path : null, 'statuses');
 
   return (
     <View
       style={{
         borderLeftWidth: 3,
         borderLeftColor: isMine ? 'rgba(255,255,255,0.7)' : colors.primary,
-        backgroundColor: isMine ? 'rgba(255,255,255,0.15)' : colors.surfaceAlt,
+        backgroundColor: isMine ? 'rgba(255,255,255,0.16)' : colors.surfaceAlt,
         borderRadius: 8,
         paddingHorizontal: 8,
         paddingVertical: 6,
@@ -595,27 +685,36 @@ function StoryReplyHeader({
         alignItems: 'center',
         gap: 8,
       }}>
+      {/* Miniatura de la historia */}
       {isImage && signedUrl ? (
         <Image
           source={{ uri: signedUrl }}
-          style={{ width: 36, height: 36, borderRadius: 6 }}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 7,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: isMine ? 'rgba(255,255,255,0.2)' : colors.border,
+          }}
           contentFit="cover"
         />
       ) : (
         <View
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: 6,
+            width: 44,
+            height: 44,
+            borderRadius: 7,
             backgroundColor: storyReply.bg_color || colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
+            padding: 2,
           }}>
-          <Icon name="flash-outline" size={16} color="#FFFFFF" />
+          <Icon name="flash" size={18} color="#FFFFFF" />
         </View>
       )}
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Icon
             name="arrow-undo-outline"
@@ -634,7 +733,7 @@ function StoryReplyHeader({
 
         <AppText
           variant="caption"
-          numberOfLines={1}
+          numberOfLines={2}
           style={{
             color: isMine ? 'rgba(255,255,255,0.85)' : colors.textMuted,
             marginTop: 1,

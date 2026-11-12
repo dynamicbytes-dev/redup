@@ -20,7 +20,8 @@ import {
   type PickedMedia,
 } from '@/features/chats/media';
 import { durationLabel, formatFileSize, messagePreview } from '@/lib/format';
-import type { ChatMessage } from '@/lib/types';
+import { useSignedMediaUrl } from '@/lib/storage';
+import type { ChatMessage, StoryReplyMeta } from '@/lib/types';
 import { useTheme } from '@/theme';
 
 type Props = {
@@ -267,39 +268,7 @@ export function Composer({
           </Pressable>
         </View>
       ) : replyTo ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            backgroundColor: colors.surface,
-            borderRadius: 12,
-            padding: 8,
-            marginBottom: 8,
-            marginHorizontal: 2,
-          }}>
-          <View
-            style={{
-              width: 3,
-              alignSelf: 'stretch',
-              borderRadius: 2,
-              backgroundColor: colors.primary,
-            }}
-          />
-          <View style={{ flex: 1 }}>
-            <AppText variant="micro" color={colors.primary} style={{ fontWeight: '700' }}>
-              Respondiendo
-            </AppText>
-            <AppText variant="caption" color={colors.textMuted} numberOfLines={1}>
-              {replyTo.deleted_at
-                ? 'Mensaje eliminado'
-                : messagePreview(replyTo.kind, replyTo.body)}
-            </AppText>
-          </View>
-          <Pressable onPress={onCancelReply} hitSlop={10}>
-            <Icon name="close" size={18} color={colors.textMuted} />
-          </Pressable>
-        </View>
+        <ComposerReplyBanner replyTo={replyTo} onCancel={onCancelReply} />
       ) : null}
 
       {pendingMedia ? (
@@ -547,6 +516,115 @@ export function Composer({
         title="Compartir en el chat"
         options={attachOptions}
       />
+    </View>
+  );
+}
+
+function ComposerReplyBanner({
+  replyTo,
+  onCancel,
+}: {
+  replyTo: ChatMessage;
+  onCancel: () => void;
+}) {
+  const { colors } = useTheme();
+  const isImage = replyTo.kind === 'image' && Boolean(replyTo.media_path);
+  const imageUrl = useSignedMediaUrl(isImage ? replyTo.media_path : null, 'media');
+  const isAudio = replyTo.kind === 'audio';
+  const isFile = replyTo.kind === 'file';
+  const replyStory = (replyTo.media_meta as { story_reply?: StoryReplyMeta } | null)?.story_reply;
+  const replyStoryUrl = useSignedMediaUrl(
+    replyStory?.kind === 'image' ? replyStory.media_path : null,
+    'statuses',
+  );
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: colors.surface,
+        borderRadius: 12,
+        padding: 8,
+        marginBottom: 8,
+        marginHorizontal: 2,
+      }}>
+      <View
+        style={{
+          width: 3,
+          alignSelf: 'stretch',
+          borderRadius: 2,
+          backgroundColor: colors.primary,
+        }}
+      />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <AppText variant="micro" color={colors.primary} style={{ fontWeight: '700' }}>
+          Respondiendo
+        </AppText>
+        <AppText variant="caption" color={colors.textMuted} numberOfLines={1}>
+          {replyTo.deleted_at
+            ? 'Mensaje eliminado'
+            : messagePreview(replyTo.kind, replyTo.body)}
+        </AppText>
+      </View>
+
+      {/* Miniatura en el compositor si es imagen o estado */}
+      {!replyTo.deleted_at && isImage && imageUrl ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={{ width: 38, height: 38, borderRadius: 6, backgroundColor: colors.surfaceAlt }}
+          contentFit="cover"
+        />
+      ) : !replyTo.deleted_at && replyStory ? (
+        replyStoryUrl ? (
+          <Image
+            source={{ uri: replyStoryUrl }}
+            style={{ width: 38, height: 38, borderRadius: 6, backgroundColor: colors.surfaceAlt }}
+            contentFit="cover"
+          />
+        ) : (
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 6,
+              backgroundColor: replyStory.bg_color || colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Icon name="flash" size={15} color="#FFFFFF" />
+          </View>
+        )
+      ) : !replyTo.deleted_at && isAudio ? (
+        <View
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 6,
+            backgroundColor: colors.primarySoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name="mic" size={15} color={colors.primary} />
+        </View>
+      ) : !replyTo.deleted_at && isFile ? (
+        <View
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 6,
+            backgroundColor: colors.primarySoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Icon name="document-text" size={15} color={colors.primary} />
+        </View>
+      ) : null}
+
+      <Pressable onPress={onCancel} hitSlop={10}>
+        <Icon name="close" size={18} color={colors.textMuted} />
+      </Pressable>
     </View>
   );
 }
