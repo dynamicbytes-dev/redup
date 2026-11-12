@@ -15,15 +15,34 @@ export class AppError extends Error {}
 
 export function getServerInviteLink(inviteCode: string): string {
   const clean = inviteCode.trim().toLowerCase();
-  return `https://redup.app/join/${clean}`;
+  return `redup://join/${clean}`;
+}
+
+export function extractServerInviteCode(text?: string | null): string | null {
+  if (!text || typeof text !== 'string') return null;
+
+  // 1. Coincidencia con esquemas o rutas join/<codigo>
+  const match = text.match(/(?:(?:https?:\/\/)?[a-zA-Z0-9.-]+\/|redup:\/\/|\b)join\/([a-zA-Z0-9_-]{4,32})/i);
+  if (match && match[1]) {
+    return match[1].toLowerCase();
+  }
+
+  // 2. Coincidencia con "código: <codigo>"
+  const codeMatch = text.match(/(?:c[oó]digo(?:\s+de\s+invitaci[oó]n)?[:\s]+)([a-zA-Z0-9_-]{6,32})/i);
+  if (codeMatch && codeMatch[1]) {
+    return codeMatch[1].toLowerCase();
+  }
+
+  return null;
 }
 
 export async function shareServerInvite(
   serverName: string,
   inviteCode: string,
 ): Promise<void> {
-  const link = getServerInviteLink(inviteCode);
-  const message = `¡Únete a mi servidor "${serverName}" en Redup!\n\nEntra usando este enlace: ${link}\nO ingresa el código: ${inviteCode}`;
+  const clean = inviteCode.trim().toLowerCase();
+  const link = getServerInviteLink(clean);
+  const message = `¡Únete a mi servidor "${serverName}" en Redup!\n\nEnlace para abrir en la app:\n${link}\n\nCódigo de invitación: ${clean}`;
 
   await Share.share({
     title: `Únete a ${serverName} en Redup`,

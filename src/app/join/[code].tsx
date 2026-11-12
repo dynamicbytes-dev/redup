@@ -97,7 +97,9 @@ export default function JoinServerScreen() {
           paddingHorizontal: 16,
           paddingVertical: 12,
         }}>
-        <Pressable hitSlop={10} onPress={() => router.replace('/chats')}>
+        <Pressable
+          hitSlop={10}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/chats'))}>
           <Icon name="close" size={24} color={colors.text} />
         </Pressable>
 
@@ -135,9 +137,9 @@ export default function JoinServerScreen() {
             <ErrorBanner message={error} />
 
             <Button
-              title="Volver al inicio"
+              title="Volver"
               variant="secondary"
-              onPress={() => router.replace('/chats')}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/chats'))}
               style={{ width: '100%', marginTop: 8 }}
             />
           </View>
@@ -190,7 +192,7 @@ export default function JoinServerScreen() {
               <Button
                 title="No gracias"
                 variant="secondary"
-                onPress={() => router.replace('/chats')}
+                onPress={() => (router.canGoBack() ? router.back() : router.replace('/chats'))}
               />
             </View>
           </View>

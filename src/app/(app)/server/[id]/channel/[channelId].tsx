@@ -23,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ServerInviteCard } from '@/components/servers/server-invite-card';
 import { ActionSheet, type SheetOption } from '@/components/ui/action-sheet';
 import { AppText } from '@/components/ui/app-text';
 import { Avatar } from '@/components/ui/avatar';
@@ -30,7 +31,7 @@ import { Icon } from '@/components/ui/icon';
 import { TextField } from '@/components/ui/text-field';
 import { useSession } from '@/features/auth/session';
 import { pickChatImageFromLibrary, uploadChatMedia } from '@/features/chats/media';
-import { shareServerInvite } from '@/features/servers/api';
+import { extractServerInviteCode, shareServerInvite } from '@/features/servers/api';
 import {
   useChannelMessages,
   useChannelRealtime,
@@ -320,6 +321,13 @@ export default function ServerChannelScreen() {
                         style={{ marginTop: 2, lineHeight: 21 }}>
                         {item.body}
                       </AppText>
+                    ) : null}
+
+                    {item.body && extractServerInviteCode(item.body) ? (
+                      <ServerInviteCard
+                        inviteCode={extractServerInviteCode(item.body)!}
+                        isMine={item.sender_id === userId}
+                      />
                     ) : null}
 
                     {item.kind === 'image' && item.media_path ? (

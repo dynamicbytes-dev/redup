@@ -5,9 +5,11 @@ import * as WebBrowser from 'expo-web-browser';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 
+import { ServerInviteCard } from '@/components/servers/server-invite-card';
 import { AppText } from '@/components/ui/app-text';
 import { Avatar } from '@/components/ui/avatar';
 import { Icon } from '@/components/ui/icon';
+import { extractServerInviteCode } from '@/features/servers/api';
 import {
   avatarTint,
   durationLabel,
@@ -77,6 +79,8 @@ export function MessageBubble({
   const isStoryReaction = Boolean(
     (message.media_meta as { is_story_reaction?: boolean } | null)?.is_story_reaction,
   );
+  const serverInviteCode =
+    !deleted && message.body ? extractServerInviteCode(message.body) : null;
   const bg = isMine ? colors.bubbleOut : colors.bubbleIn;
   const fg = isMine ? colors.bubbleOutText : colors.bubbleInText;
   const senderColor = avatarTint(message.sender_id ?? senderName);
@@ -191,7 +195,16 @@ export function MessageBubble({
             {message.body}
           </AppText>
         ) : (
-          <AppText style={{ color: fg, fontSize: 15.5, lineHeight: 21 }}>{message.body}</AppText>
+          <View style={{ gap: 4 }}>
+            {message.body ? (
+              <AppText style={{ color: fg, fontSize: 15.5, lineHeight: 21 }}>
+                {message.body}
+              </AppText>
+            ) : null}
+            {serverInviteCode ? (
+              <ServerInviteCard inviteCode={serverInviteCode} isMine={isMine} />
+            ) : null}
+          </View>
         )}
 
         <View

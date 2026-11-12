@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ServerInviteCard } from '@/components/servers/server-invite-card';
 import { AppText } from '@/components/ui/app-text';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ import { useSession } from '@/features/auth/session';
 import { createDirectConversation } from '@/features/chats/api';
 import { pickChatImageFromLibrary, uploadChatMedia } from '@/features/chats/media';
 import { sendFriendRequest } from '@/features/friends/api';
+import { extractServerInviteCode } from '@/features/servers/api';
 import {
   useCreateWallComment,
   useCreateWallPost,
@@ -340,6 +342,13 @@ export default function WallScreen() {
                       style={{ marginTop: 6, fontSize: 15.5, lineHeight: 22 }}>
                       {item.content}
                     </AppText>
+
+                    {item.content && extractServerInviteCode(item.content) ? (
+                      <ServerInviteCard
+                        inviteCode={extractServerInviteCode(item.content)!}
+                        isMine={item.author_id === userId}
+                      />
+                    ) : null}
 
                     {/* Imagen adjunta */}
                     {item.media_path ? (
