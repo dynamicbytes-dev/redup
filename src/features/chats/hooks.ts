@@ -56,8 +56,8 @@ export function useMessages(conversationId: string) {
       pages.push(first);
       return { pages, pageParams: [null] } as MessagesData;
     },
-    // El historial se pagina a mano con `loadOlder`
-    staleTime: 60_000,
+    // Entrega fresca e invalidación reactiva instantánea
+    staleTime: 2_000,
   });
 }
 

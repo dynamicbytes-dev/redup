@@ -21,16 +21,24 @@ export function getServerInviteLink(inviteCode: string): string {
 export function extractServerInviteCode(text?: string | null): string | null {
   if (!text || typeof text !== 'string') return null;
 
+  const trimmed = text.trim();
+
   // 1. Coincidencia con esquemas o rutas join/<codigo>
-  const match = text.match(/(?:(?:https?:\/\/)?[a-zA-Z0-9.-]+\/|redup:\/\/|\b)join\/([a-zA-Z0-9_-]{4,32})/i);
+  const match = trimmed.match(/(?:(?:https?:\/\/)?[a-zA-Z0-9.-]+\/|redup:\/\/|\b)join\/([a-zA-Z0-9_-]{4,32})/i);
   if (match && match[1]) {
     return match[1].toLowerCase();
   }
 
   // 2. Coincidencia con "código: <codigo>"
-  const codeMatch = text.match(/(?:c[oó]digo(?:\s+de\s+invitaci[oó]n)?[:\s]+)([a-zA-Z0-9_-]{6,32})/i);
+  const codeMatch = trimmed.match(/(?:c[oó]digo(?:\s+de\s+invitaci[oó]n)?[:\s]+)([a-zA-Z0-9_-]{4,32})/i);
   if (codeMatch && codeMatch[1]) {
     return codeMatch[1].toLowerCase();
+  }
+
+  // 3. Código alfanumérico directo (ej. "bcaa5c8c" o "a8f9x2c1")
+  const directMatch = trimmed.match(/^[a-zA-Z0-9_-]{4,32}$/);
+  if (directMatch) {
+    return directMatch[0].toLowerCase();
   }
 
   return null;
@@ -284,13 +292,7 @@ export async function leaveDiscordServer(serverId: string, userId: string): Prom
 }
 
 export async function getServerPreviewByCode(inviteCode: string): Promise<ServerPreview | null> {
-  // Extraer el código en caso de que hayan pegado una URL completa
-  let clean = inviteCode.trim();
-  if (clean.includes('/')) {
-    const parts = clean.split('/');
-    clean = parts[parts.length - 1];
-  }
-  clean = clean.toLowerCase();
+  const clean = extractServerInviteCode(inviteCode) || inviteCode.trim().toLowerCase();
 
   const { data, error } = await supabase.rpc('get_server_preview_by_code', {
     p_code: clean,
@@ -306,12 +308,7 @@ export async function joinServerByCode(inviteCode: string): Promise<{
   channel_id: string;
   already_member: boolean;
 }> {
-  let clean = inviteCode.trim();
-  if (clean.includes('/')) {
-    const parts = clean.split('/');
-    clean = parts[parts.length - 1];
-  }
-  clean = clean.toLowerCase();
+  const clean = extractServerInviteCode(inviteCode) || inviteCode.trim().toLowerCase();
 
   const { data, error } = await supabase.rpc('join_server_by_code', {
     p_code: clean,

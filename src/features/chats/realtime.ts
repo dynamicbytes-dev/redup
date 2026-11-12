@@ -30,11 +30,10 @@ export function useChatRealtime(
   useEffect(() => {
     if (!conversationId || !userId) return;
 
-    // Canal privado autorizado: solo miembros de la conversación pueden suscribirse
-    // Protegido por RLS en realtime.messages (anti-espionaje de typing y presencia)
+    // Canal de conversación en tiempo real (mensajes, typing y presencia)
+    // RLS en PostgreSQL protege las filas de messages para los miembros
     const channel = supabase.channel(`conv:${conversationId}`, {
       config: {
-        private: true,
         presence: { key: userId },
       },
     });

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   Keyboard,
   Modal,
@@ -181,8 +182,19 @@ export default function ChatScreen() {
 
   useEffect(() => {
     setActiveConversationId(conversationId);
+    // Refresco inmediato al entrar al chat para sincronización instantánea
+    queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
     return () => setActiveConversationId(null);
-  }, [conversationId]);
+  }, [conversationId, queryClient]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        queryClient.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
+      }
+    });
+    return () => sub.remove();
+  }, [conversationId, queryClient]);
 
   const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
   const otherMembers = members.filter((member) => member.user_id !== userId);

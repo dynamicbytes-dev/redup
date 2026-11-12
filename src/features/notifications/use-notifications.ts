@@ -9,6 +9,7 @@ import { isMutedUntil } from '@/lib/format';
 import { queryKeys } from '@/lib/query-client';
 import { supabase } from '@/lib/supabase';
 import type { ConversationOverview, Message } from '@/lib/types';
+import { upsertMessage } from '@/features/chats/hooks';
 
 import {
   ensureNotificationHandlerConfigured,
@@ -102,7 +103,15 @@ export function useNotificationsBootstrap(userId: string | null) {
           const msg = payload.new as Message | undefined;
           if (!msg || !msg.id) return;
           if (msg.sender_id === userId || msg.kind === 'system') return;
-          if (getActiveConversationId() === msg.conversation_id) return;
+
+          // Si el chat está actualmente abierto en pantalla:
+          // Insertar inmediatamente en la caché para entrega instantánea sin latencia.
+          if (getActiveConversationId() === msg.conversation_id) {
+            upsertMessage(queryClient, msg.conversation_id, msg);
+            queryClient.invalidateQueries({ queryKey: queryKeys.messages(msg.conversation_id) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.conversations });
+            return;
+          }
 
           if (notifiedIdsRef.current.has(msg.id)) return;
           notifiedIdsRef.current.add(msg.id);
