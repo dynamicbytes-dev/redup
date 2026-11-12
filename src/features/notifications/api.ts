@@ -89,7 +89,7 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
       name: 'Mensajes',
       importance: AndroidImportance.MAX,
       vibrationPattern: [0, 220, 160, 220],
-      lightColor: '#5B4BE8',
+      lightColor: '#E6192E',
       showBadge: true,
     }).catch(() => {});
   }
@@ -217,7 +217,7 @@ export async function scheduleTestNotificationAsync(
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Redup · Notificación de prueba',
+      title: 'Akatsuki Chat · Notificación de prueba',
       body: conversationId
         ? 'Toca para abrir la conversación directamente.'
         : 'Las notificaciones push están activas en este dispositivo.',

@@ -228,7 +228,7 @@ function ContactDetailView({
             Estado
           </AppText>
           <AppText style={{ fontSize: 15.5 }}>
-            {profile.about?.trim() || '¡Hola! Estoy usando Redup.'}
+            {profile.about?.trim() || '¡Hola! Estoy usando Akatsuki Chat.'}
           </AppText>
         </View>
 

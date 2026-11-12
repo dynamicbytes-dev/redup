@@ -14,13 +14,13 @@ export default function WelcomeScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
       <View style={{ flex: 1, paddingHorizontal: 28, paddingTop: 40, paddingBottom: 20 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18 }}>
-          <Logo size={92} />
-          <Wordmark size={40} color={colors.text} />
+          <Logo size={96} />
+          <Wordmark size={36} color={colors.text} />
           <AppText
             align="center"
             color={colors.textMuted}
-            style={{ maxWidth: 290, fontSize: 16, lineHeight: 23, marginTop: 4 }}>
-            Conversaciones con tu gente. Rápidas, privadas y sin ruido.
+            style={{ maxWidth: 300, fontSize: 16, lineHeight: 23, marginTop: 4 }}>
+            Tu clan, tus reglas. Conversaciones rápidas, privadas y con todo el poder del chakra.
           </AppText>
         </View>
 

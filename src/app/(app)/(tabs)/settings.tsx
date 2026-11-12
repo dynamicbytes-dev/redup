@@ -26,7 +26,7 @@ export default function SettingsScreen() {
   const push = usePushSettings();
 
   function confirmSignOut() {
-    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir de Redup?', [
+    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir de Akatsuki Chat?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Salir', style: 'destructive', onPress: () => signOut() },
     ]);
@@ -298,10 +298,10 @@ export default function SettingsScreen() {
 
         <View style={{ alignItems: 'center', marginTop: 26, gap: 4 }}>
           <AppText variant="micro" color={colors.textFaint}>
-            Redup 0.1.0 · prototipo
+            Akatsuki Chat 1.0.0
           </AppText>
           <AppText variant="micro" color={colors.textFaint}>
-            Hecho con Expo y Supabase
+            Sharingan & Akatsuki Edition
           </AppText>
         </View>
       </ScrollView>

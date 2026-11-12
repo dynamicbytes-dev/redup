@@ -42,10 +42,10 @@ export async function shareServerInvite(
 ): Promise<void> {
   const clean = inviteCode.trim().toLowerCase();
   const link = getServerInviteLink(clean);
-  const message = `¡Únete a mi servidor "${serverName}" en Redup!\n\nEnlace para abrir en la app:\n${link}\n\nCódigo de invitación: ${clean}`;
+  const message = `¡Únete a mi servidor "${serverName}" en Akatsuki Chat!\n\nEnlace para abrir en la app:\n${link}\n\nCódigo de invitación: ${clean}`;
 
   await Share.share({
-    title: `Únete a ${serverName} en Redup`,
+    title: `Únete a ${serverName} en Akatsuki Chat`,
     message,
     url: link,
   });

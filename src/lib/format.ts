@@ -62,14 +62,14 @@ export function initials(name: string | null | undefined): string {
 }
 
 const AVATAR_TINTS = [
-  '#5B4BE8',
-  '#FF6B5B',
-  '#0E9F6E',
-  '#D97706',
-  '#0EA5E9',
-  '#A855F7',
-  '#DB2777',
-  '#0F766E',
+  '#DC2626', // Akatsuki Crimson
+  '#EA580C', // Naruto Sage Orange
+  '#0284C7', // Chidori Lightning Cyan
+  '#991B1B', // Sharingan Deep Crimson
+  '#D97706', // Hokage Chakra Gold
+  '#16A34A', // Konoha Leaf Green
+  '#4F46E5', // Amaterasu Deep Violet
+  '#0D9488', // Mist Shark Teal
 ];
 
 export function avatarTint(seed: string | null | undefined): string {

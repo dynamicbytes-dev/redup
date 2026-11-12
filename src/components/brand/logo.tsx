@@ -1,43 +1,30 @@
+import { Image } from 'expo-image';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { brand } from '@/theme/tokens';
 
 export function Logo({ size = 60 }: { size?: number }) {
-  const glyphSize = Math.round(size * 0.54);
-  const glyphLineHeight = Math.round(glyphSize * 1.18);
-
   return (
     <View
       style={{
         width: size,
         height: size,
-        borderRadius: size * 0.32,
-        backgroundColor: brand.indigo,
-        alignItems: 'center',
-        justifyContent: 'center',
+        borderRadius: size / 2,
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: brand.crimson,
+        backgroundColor: brand.obsidian,
+        shadowColor: brand.crimson,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.6,
+        shadowRadius: 10,
+        elevation: 8,
       }}>
-      <AppText
-        style={{
-          color: '#FFFFFF',
-          fontSize: glyphSize,
-          lineHeight: glyphLineHeight,
-          fontWeight: '800',
-          letterSpacing: -1,
-          includeFontPadding: false,
-        }}>
-        r
-      </AppText>
-      <View
-        style={{
-          position: 'absolute',
-          right: size * 0.17,
-          bottom: size * 0.17,
-          width: size * 0.17,
-          height: size * 0.17,
-          borderRadius: size * 0.085,
-          backgroundColor: brand.coral,
-        }}
+      <Image
+        source={require('../../../assets/images/icon.png')}
+        style={{ width: '100%', height: '100%' }}
+        contentFit="cover"
       />
     </View>
   );
@@ -51,30 +38,56 @@ export function Wordmark({ size = 26, color }: { size?: number; color: string })
     <View
       style={{
         flexDirection: 'row',
-        alignItems: 'baseline',
+        alignItems: 'center',
         paddingVertical: 2,
+        gap: 6,
       }}>
-      <AppText
+      <Image
+        source={require('../../../assets/images/icon.png')}
         style={{
-          color,
-          fontSize: size,
-          lineHeight,
-          fontWeight: '800',
-          letterSpacing: -0.8,
-          includeFontPadding: false,
-        }}>
-        redup
-      </AppText>
-      <View
-        style={{
-          width: dotSize,
-          height: dotSize,
-          borderRadius: dotSize / 2,
-          backgroundColor: brand.coral,
-          marginLeft: Math.max(2, Math.round(size * 0.06)),
-          marginBottom: Math.round(size * 0.04),
+          width: size * 0.9,
+          height: size * 0.9,
+          borderRadius: (size * 0.9) / 2,
+          borderWidth: 1,
+          borderColor: brand.crimson,
         }}
+        contentFit="cover"
       />
+      <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+        <AppText
+          style={{
+            color,
+            fontSize: size,
+            lineHeight,
+            fontWeight: '900',
+            letterSpacing: -0.5,
+            includeFontPadding: false,
+          }}>
+          Akatsuki
+        </AppText>
+        <AppText
+          style={{
+            color: brand.crimson,
+            fontSize: size,
+            lineHeight,
+            fontWeight: '900',
+            letterSpacing: -0.5,
+            marginLeft: 4,
+            includeFontPadding: false,
+          }}>
+          Chat
+        </AppText>
+        <View
+          style={{
+            width: dotSize,
+            height: dotSize,
+            borderRadius: dotSize / 2,
+            backgroundColor: brand.narutoOrange,
+            marginLeft: Math.max(3, Math.round(size * 0.08)),
+            marginBottom: Math.round(size * 0.12),
+          }}
+        />
+      </View>
     </View>
   );
 }

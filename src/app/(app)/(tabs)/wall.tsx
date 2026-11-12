@@ -412,7 +412,7 @@ export default function WallScreen() {
                           if (item.media_path) {
                             shareLocalOrRemoteMedia(item.media_path);
                           } else {
-                            Alert.alert('Muro de Redup', `"${item.content}"`);
+                            Alert.alert('Muro de Akatsuki', `"${item.content}"`);
                           }
                         }}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

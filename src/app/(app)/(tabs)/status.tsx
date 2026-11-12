@@ -46,13 +46,13 @@ import { useKeyboardHeight } from '@/lib/use-keyboard';
 import { useTheme } from '@/theme';
 
 const STATUS_COLORS = [
-  '#5B4BE8',
-  '#FF6B5B',
-  '#0E9F6E',
-  '#0EA5E9',
-  '#D97706',
-  '#DB2777',
-  '#1E1B2E',
+  '#DC2626', // Akatsuki Crimson
+  '#EA580C', // Naruto Sage Orange
+  '#0A0A0E', // Ninja Obsidian
+  '#0284C7', // Chidori Cyan
+  '#991B1B', // Sharingan Burgundy
+  '#D97706', // Kurama Chakra Amber
+  '#1E1B2E', // Akatsuki Cloak Slate
 ];
 
 export default function StatusScreen() {
